@@ -1518,13 +1518,27 @@ def literature():
                     total_volume = sum(phase_data["liquids"].values()) if phase_data["liquids"] else 0
                     overall_ratio = total_mass / total_volume if total_volume > 0 else 0
 
+                    # Calcola il rapporto massa/liquido per tipo di liquido
+                    for liquid_type, liquid_volume in phase_data["liquids"].items():
+                        liquid_ratio = total_mass / liquid_volume if liquid_volume > 0 else 0
+                        sl_results.append({
+                            "Phase": phase_name,
+                            "Liquid Type": liquid_type,
+                            "Total Mass (kg)": total_mass,
+                            "Liquid Volume (L)": liquid_volume,
+                            "S/L Ratio": liquid_ratio
+                        })
+
+                    # Aggiungi il rapporto complessivo
                     sl_results.append({
                         "Phase": phase_name,
+                        "Liquid Type": "Overall",
                         "Total Mass (kg)": total_mass,
-                        "Total Volume (L)": total_volume,
-                        "Overall S/L Ratio": overall_ratio
+                        "Liquid Volume (L)": total_volume,
+                        "S/L Ratio": overall_ratio
                     })
 
+                # Mostra risultati in tabella
                 sl_df = pd.DataFrame(sl_results)
                 st.table(sl_df)
 
