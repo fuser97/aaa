@@ -1808,10 +1808,11 @@ def benchmarking():
 
         # Calcolo complessivo per la fonte
         total_mass = sum(phase_info.get("mass", 0) for phase_info in phases.values())
-        total_volume = sum(
-            sum(liquid.get("volume", 0) for liquid in phase_info.get("liquids", []))
-            for phase_info in phases.values()
-        )
+        if phase_info and isinstance(phase_info.get("liquids", []), list):
+            total_volume = sum(liquid.get("volume", 0) for liquid in phase_info["liquids"])
+        else:
+            total_volume = 0
+
         overall_sl_ratio = total_mass / total_volume if total_volume > 0 else 0
 
         overall_data.append({
@@ -2085,6 +2086,5 @@ elif page == "Literature":
     literature()
 elif page == "Benchmarking":
     benchmarking()
-
 
 
