@@ -1406,29 +1406,21 @@ def literature():
             # === Solid/Liquid Ratios ===
             if selected_section == "Solid/Liquid Ratios":
                 st.subheader("Solid/Liquid Ratios for Each Phase")
+
+                # Ottieni le fasi dai technical KPIs
                 phases = technical_kpis.get("phases", {})
                 updated_phases = {}
 
-                # Aggiungi una nuova fase
-                new_phase_name = st.text_input("New Phase Name:", key="new_phase_name")
-                if st.button("Add Phase"):
-                    if new_phase_name and new_phase_name not in st.session_state.phases:
-                        st.session_state.phases[new_phase_name] = {"liquids": [], "mass": 0.0}
-                        st.success(f"Phase '{new_phase_name}' added.")
-                        st.experimental_rerun()
-                    else:
-                        st.error("Phase name is invalid or already exists!")
-
+                # Itera sulle fasi esistenti
                 for phase_name, phase_data in phases.items():
                     st.subheader(f"Phase: {phase_name}")
 
-                    # Pulsante per rimuovere la fase
-                    if st.button(f"Remove Phase '{phase_name}'", key=f"remove_phase_{phase_name}"):
-                        del st.session_state.phases[phase_name]
+                    # Pulsante per rimuovere una fase
+                    if st.button(f"Remove Phase '{phase_name}'", key=f"remove_phase_{case_study_name}_{phase_name}"):
+                        del phases[phase_name]
                         st.success(f"Phase '{phase_name}' removed.")
+                        save_case_studies()
                         st.experimental_rerun()
-
-                    # (Resto del codice esistente per gestire i dati della fase)
 
                     # Massa per la fase
                     masses = phase_data.get("masses", {})
@@ -1444,8 +1436,7 @@ def literature():
                             )
                         with col2:
                             new_mass_value = st.number_input(
-                                f"Mass (kg) for {mass_type}:", min_value=0.0,
-                                value=mass_value, step=0.1,
+                                f"Mass (kg) for {mass_type}:", min_value=0.0, value=mass_value, step=0.1,
                                 key=f"mass_value_{case_study_name}_{phase_name}_{mass_type}"
                             )
                         with col3:
@@ -1455,7 +1446,7 @@ def literature():
 
                         updated_masses[new_mass_type] = new_mass_value
 
-                    # Aggiungi nuovo tipo di massa
+                    # Aggiungi nuova massa
                     new_mass_type = st.text_input(f"New Mass Type for {phase_name}:",
                                                   key=f"new_mass_type_{case_study_name}_{phase_name}")
                     new_mass_value = st.number_input(
@@ -1469,23 +1460,12 @@ def literature():
                         else:
                             st.error("Invalid or duplicate mass type!")
 
-                    # Aggiorna le masse della fase
-                    masses = updated_masses
-
                     # Liquidi per la fase
                     liquids = phase_data.get("liquids", {})
                     updated_liquids = {}
 
                     st.markdown("##### Liquid Types")
-                    # Verifica che `liquids` sia un dizionario
-                    if isinstance(liquids, list):
-                        liquids = {f"Liquid {i + 1}": vol for i, vol in enumerate(liquids)}
-                    elif not isinstance(liquids, dict):
-                        liquids = {}
-
-                    # Iterazione sicura
                     for liquid_type, liquid_volume in liquids.items():
-
                         col1, col2, col3 = st.columns([2, 1, 1])
                         with col1:
                             new_liquid_type = st.text_input(
@@ -1494,8 +1474,7 @@ def literature():
                             )
                         with col2:
                             new_liquid_volume = st.number_input(
-                                f"Volume (L) for {liquid_type}:", min_value=0.0,
-                                value=liquid_volume, step=0.1,
+                                f"Volume (L) for {liquid_type}:", min_value=0.0, value=liquid_volume, step=0.1,
                                 key=f"liquid_volume_{case_study_name}_{phase_name}_{liquid_type}"
                             )
                         with col3:
@@ -1505,7 +1484,7 @@ def literature():
 
                         updated_liquids[new_liquid_type] = new_liquid_volume
 
-                    # Aggiungi nuovo tipo di liquido
+                    # Aggiungi nuovo liquido
                     new_liquid_type = st.text_input(f"New Liquid Type for {phase_name}:",
                                                     key=f"new_liquid_type_{case_study_name}_{phase_name}")
                     new_liquid_volume = st.number_input(
@@ -1515,74 +1494,14 @@ def literature():
                     if st.button(f"Add Liquid for {phase_name}", key=f"add_liquid_{case_study_name}_{phase_name}"):
                         if new_liquid_type and new_liquid_type not in updated_liquids:
                             updated_liquids[new_liquid_type] = new_liquid_volume
-                            st.success(f"Added new liquid type: {new_liquid_type}")
+                            st.success(f"Added new liquid: {new_liquid_type}")
                         else:
                             st.error("Invalid or duplicate liquid type!")
 
-                    # Aggiorna i liquidi della fase
-                    liquids = updated_liquids
+                    # Aggiorna dati della fase
+                    updated_phases[phase_name] = {"masses": updated_masses, "liquids": updated_liquids}
 
-                    # Calcolo rapporti massa/liquido
-                    st.markdown("##### Solid/Liquid Ratios")
-                    sl_results = []
-
-                    # Assicura che `liquids` sia un dizionario
-                    # Assicura che `liquids` sia un dizionario
-                    if isinstance(liquids, list):
-                        # Converti lista in dizionario, usando l'indice come chiave
-                        st.warning(f"'liquids' was a list. Converting to dictionary with indexed keys.")
-                        liquids = {f"Liquid {i + 1}": vol for i, vol in enumerate(liquids)}
-                    elif not isinstance(liquids, dict):
-                        # Inizializza come dizionario vuoto se non è valido
-                        st.warning(f"'liquids' was of type {type(liquids)}. Resetting to empty dictionary.")
-                        liquids = {}
-
-                    # Iterazione su masse e liquidi
-                    for mass_type, mass_value in masses.items():
-                        # Verifica che `liquids` sia un dizionario
-                        if isinstance(liquids, list):
-                            liquids = {f"Liquid {i + 1}": vol for i, vol in enumerate(liquids)}
-                        elif not isinstance(liquids, dict):
-                            liquids = {}
-
-                        # Iterazione sicura
-                        for liquid_type, liquid_volume in liquids.items():
-
-                            # Verifica che `liquid_volume` sia numerico
-                            if not isinstance(liquid_volume, (int, float)):
-                                st.warning(
-                                    f"Invalid liquid volume for '{liquid_type}' in phase '{phase_name}'. Resetting to 0.")
-                                liquid_volume = 0  # Imposta un valore predefinito se non è numerico
-
-                            # Calcola il rapporto massa/liquido
-                            ratio = mass_value / liquid_volume if liquid_volume > 0 else 0
-                            sl_results.append({
-                                "Phase": phase_name,
-                                "Mass Type": mass_type,
-                                "Liquid Type": liquid_type,
-                                "Mass (kg)": mass_value,
-                                "Liquid Volume (L)": liquid_volume,
-                                "S/L Ratio": ratio
-                            })
-
-                    # Calcolo rapporto complessivo
-                    total_mass = sum(masses.values())
-                    total_volume = sum(liquids.values()) if liquids else 0
-                    overall_ratio = total_mass / total_volume if total_volume > 0 else 0
-                    sl_results.append({
-                        "Phase": phase_name,
-                        "Mass Type": "Overall",
-                        "Liquid Type": "Overall",
-                        "Mass (kg)": total_mass,
-                        "Liquid Volume (L)": total_volume,
-                        "S/L Ratio": overall_ratio
-                    })
-
-                    # Mostra risultati in tabella
-                    sl_df = pd.DataFrame(sl_results)
-                    st.table(sl_df)
-
-                # Aggiungi nuova fase
+                # Aggiungi una nuova fase
                 new_phase_name = st.text_input("New Phase Name:", key=f"new_phase_name_{case_study_name}")
                 if st.button("Add Phase", key=f"add_phase_{case_study_name}"):
                     if new_phase_name and new_phase_name not in updated_phases:
@@ -1591,9 +1510,28 @@ def literature():
                     else:
                         st.error("Phase already exists or name is invalid!")
 
-                # Salva le modifiche alle fasi
+                # Calcola rapporti Solid/Liquid
+                st.markdown("### Solid/Liquid Ratios")
+                sl_results = []
+                for phase_name, phase_data in updated_phases.items():
+                    total_mass = sum(phase_data["masses"].values())
+                    total_volume = sum(phase_data["liquids"].values()) if phase_data["liquids"] else 0
+                    overall_ratio = total_mass / total_volume if total_volume > 0 else 0
+
+                    sl_results.append({
+                        "Phase": phase_name,
+                        "Total Mass (kg)": total_mass,
+                        "Total Volume (L)": total_volume,
+                        "Overall S/L Ratio": overall_ratio
+                    })
+
+                sl_df = pd.DataFrame(sl_results)
+                st.table(sl_df)
+
+                # Salva i dati aggiornati
                 technical_kpis["phases"] = updated_phases
                 save_case_studies()
+
 
 
             # === Add/Modify Custom KPIs ===
