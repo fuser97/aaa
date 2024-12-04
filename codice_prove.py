@@ -1769,67 +1769,47 @@ def benchmarking():
         ax_material.set_xticklabels(efficiency_df["Source"], rotation=45, ha="right")
         st.pyplot(fig_material)
 
-    # Confronto massa/volume per fase
-    st.markdown("### Solid/Liquid Ratios Comparison: Per Phase and Overall")
+def process_source_data(source_name, source_type, source_data):
+    """
+    Processa i dati di uno scenario o case study per calcolare i rapporti massa/volume.
+    """
+    mass_volume_ratios = []
 
-    # Raccogli i dati per il confronto
-    phase_data = []  # Dati per confronto fase/liquido
-    overall_data = []  # Dati complessivi per confronto generale
+    st.write(f"Processing source: {source_type}: {source_name}")
 
-    # Modifica della parte di raccolta dati nel benchmarking
-
-    mass_volume_ratios = []  # Lista per raccogliere i dati
-
-    for source in sources:
-        source_name = source["name"]
-        source_type = source["type"]
-        source_data = source["data"]
-
-        # Debug print
-        st.write(f"Processing source: {source_type}: {source_name}")
-
-        # Get the technical KPIs data
-        tech_kpis = source_data.get("technical_kpis", {})
-        phases = tech_kpis.get("phases", {})
-
-        # Debug print
-        st.write(f"Found phases: {list(phases.keys())}")
-
-        if not phases and source_type == "Scenario":
-            # Se non ci sono fasi nei technical_kpis, prova a cercare direttamente nello scenario
-            if "phases" in source_data:
-                phases = source_data["phases"]
-                st.write("Using phases directly from scenario data")
-
-        # Debug print
-        st.write(f"Processing phases: {list(phases.keys())}")
+    if source_type == "Scenario":
+        phases = source_data.get("phases", {})
+        st.write("Scenario phases structure:", phases)
 
         for phase_name, phase_data in phases.items():
-            # Debug print
-            st.write(f"\nProcessing phase: {phase_name}")
-            st.write(f"Phase data: {phase_data}")
+            st.write(f"\nPhase data for {phase_name}:", phase_data)
 
-            # Get mass data - handle both dictionary and direct value formats
-            if isinstance(phase_data.get("masses", {}), dict):
-                total_mass = sum(phase_data.get("masses", {}).values())
-            else:
+            # Gestione massa
+            if isinstance(phase_data, dict):
                 total_mass = phase_data.get("mass", 0)
+                if total_mass == 0:
+                    masses = phase_data.get("masses", {})
+                    if isinstance(masses, dict):
+                        total_mass = sum(masses.values())
+            else:
+                total_mass = 0
 
-            # Debug print
-            st.write(f"Total mass for phase: {total_mass}")
+            st.write(f"Total mass for {phase_name}: {total_mass}")
 
-            # Get liquids data - handle both list and dictionary formats
-            liquids = phase_data.get("liquids", [])
-            st.write(f"Liquids data: {liquids}")
+            # Gestione liquidi
+            liquids = phase_data.get("liquids", []) if isinstance(phase_data, dict) else []
+            total_volume = 0
+
+            st.write(f"Liquids for {phase_name}:", liquids)
 
             if isinstance(liquids, list):
-                # Handle list format
                 for liquid in liquids:
                     if isinstance(liquid, dict):
                         liquid_type = liquid.get("type", "Unknown")
                         liquid_volume = liquid.get("volume", 0)
+                        total_volume += liquid_volume
 
-                        if liquid_volume > 0:
+                        if liquid_volume > 0 and total_mass > 0:
                             sl_ratio = total_mass / liquid_volume
                         else:
                             sl_ratio = 0
@@ -1843,28 +1823,8 @@ def benchmarking():
                             "S/L Ratio": sl_ratio
                         })
 
-            elif isinstance(liquids, dict):
-                # Handle dictionary format
-                for liquid_type, liquid_volume in liquids.items():
-                    if liquid_volume > 0:
-                        sl_ratio = total_mass / liquid_volume
-                    else:
-                        sl_ratio = 0
-
-                    mass_volume_ratios.append({
-                        "Source": f"{source_type}: {source_name}",
-                        "Phase": phase_name,
-                        "Liquid Type": liquid_type,
-                        "Phase Mass (kg)": total_mass,
-                        "Liquid Volume (L)": liquid_volume,
-                        "S/L Ratio": sl_ratio
-                    })
-
-            # Calculate overall ratio for the phase
-            total_volume = sum(liquid.get("volume", 0) for liquid in liquids) if isinstance(liquids, list) else sum(
-                liquids.values())
-
-            if total_volume > 0:
+            # Calcolo ratio complessivo
+            if total_volume > 0 and total_mass > 0:
                 overall_ratio = total_mass / total_volume
             else:
                 overall_ratio = 0
@@ -1878,39 +1838,59 @@ def benchmarking():
                 "S/L Ratio": overall_ratio
             })
 
-    # Converti in DataFrame e mostra i dati processati
-    mass_volume_df = pd.DataFrame(mass_volume_ratios)
-    st.write("Processed Data:")
-    st.write(mass_volume_df)
+    else:  # Literature case studies
+        phases = source_data.get("phases", {})
+        for phase_name, phase_info in phases.items():
+            st.write(f"\nLiterature phase data for {phase_name}:", phase_info)
 
-    # Verifica le sorgenti uniche nel DataFrame
-    st.write("\nUnique sources in the data:")
-    st.write(mass_volume_df["Source"].unique())
-    # Debug output
-    st.write("Processed Data:")
-    debug_df = pd.DataFrame(mass_volume_ratios)
-    st.write(debug_df)
+            total_mass = phase_info.get("mass", 0)
+            liquids = phase_info.get("liquids", {})
 
-    # Dopo l'iterazione, mass_volume_ratios conterrà i dati per benchmarking
-    mass_volume_df = pd.DataFrame(mass_volume_ratios)
+            total_volume = 0
+            for liquid_type, liquid_volume in liquids.items():
+                if isinstance(liquid_volume, (int, float)) and liquid_volume > 0 and total_mass > 0:
+                    sl_ratio = total_mass / liquid_volume
+                    total_volume += liquid_volume
+                else:
+                    sl_ratio = 0
 
-    # Converti i dati in DataFrame
-    phase_df = pd.DataFrame(phase_data)
-    overall_df = pd.DataFrame(overall_data)
+                mass_volume_ratios.append({
+                    "Source": f"{source_type}: {source_name}",
+                    "Phase": phase_name,
+                    "Liquid Type": liquid_type,
+                    "Phase Mass (kg)": total_mass,
+                    "Liquid Volume (L)": liquid_volume,
+                    "S/L Ratio": sl_ratio
+                })
 
-    # --- Confronto per fase/liquido ---
+            if total_volume > 0 and total_mass > 0:
+                overall_ratio = total_mass / total_volume
+            else:
+                overall_ratio = 0
+
+            mass_volume_ratios.append({
+                "Source": f"{source_type}: {source_name}",
+                "Phase": phase_name,
+                "Liquid Type": "Overall",
+                "Phase Mass (kg)": total_mass,
+                "Liquid Volume (L)": total_volume,
+                "S/L Ratio": overall_ratio
+            })
+
+    return mass_volume_ratios
+
+def create_phase_specific_tables(mass_volume_df):
+    """
+    Crea tabelle specifiche per ogni fase.
+    """
     st.markdown("#### Phase-Specific Solid/Liquid Ratios Table")
 
-    # Assicura che `mass_volume_df` esista e non sia vuoto
     if not mass_volume_df.empty:
         for phase_name in mass_volume_df["Phase"].unique():
             st.markdown(f"##### Phase: {phase_name}")
-
-            # Filtra i dati per la fase corrente
             phase_specific_df = mass_volume_df[mass_volume_df["Phase"] == phase_name]
 
             try:
-                # Pivot table per mostrare i dati organizzati
                 pivot_table = phase_specific_df.pivot_table(
                     index=["Liquid Type"],
                     columns=["Source"],
@@ -1921,10 +1901,12 @@ def benchmarking():
             except Exception as e:
                 st.error(f"Error creating pivot table for phase {phase_name}: {str(e)}")
 
-    # --- Confronto complessivo ---
+def create_overall_comparison_table(mass_volume_df):
+    """
+    Crea la tabella di confronto complessiva per tutti i rapporti S/L.
+    """
     st.markdown("#### Overall Solid/Liquid Ratios Table")
 
-    # Aggrega i dati complessivi per ogni fonte
     overall_df = (
         mass_volume_df[mass_volume_df["Liquid Type"] == "Overall"]
             .groupby("Source")[["Phase Mass (kg)", "Liquid Volume (L)", "S/L Ratio"]]
@@ -1934,58 +1916,72 @@ def benchmarking():
 
     if not overall_df.empty:
         st.table(overall_df)
+    else:
+        st.warning("No overall data available for comparison.")
 
-    # --- Visualizzazioni Grafiche ---
-    st.markdown("### Graphical Representations")
+def create_comparison_charts(mass_volume_df):
+    """
+    Crea i grafici di confronto per masse, volumi e rapporti.
+    """
+    overall_df = (
+        mass_volume_df[mass_volume_df["Liquid Type"] == "Overall"]
+            .groupby("Source")[["Phase Mass (kg)", "Liquid Volume (L)", "S/L Ratio"]]
+            .sum()
+            .reset_index()
+    )
 
-    # Grafico comparativo per le masse complessive
     if not overall_df.empty:
+        # Grafico masse
         fig_mass, ax_mass = plt.subplots(figsize=(10, 6))
         ax_mass.bar(overall_df["Source"], overall_df["Phase Mass (kg)"], color="blue")
         ax_mass.set_xlabel("Sources")
         ax_mass.set_ylabel("Total Mass (kg)")
         ax_mass.set_title("Total Mass Comparison")
         ax_mass.set_xticklabels(overall_df["Source"], rotation=45, ha="right")
+        plt.tight_layout()
         st.pyplot(fig_mass)
 
-        # Grafico comparativo per i volumi complessivi
+        # Grafico volumi
         fig_volume, ax_volume = plt.subplots(figsize=(10, 6))
         ax_volume.bar(overall_df["Source"], overall_df["Liquid Volume (L)"], color="green")
         ax_volume.set_xlabel("Sources")
         ax_volume.set_ylabel("Total Volume (L)")
         ax_volume.set_title("Total Volume Comparison")
         ax_volume.set_xticklabels(overall_df["Source"], rotation=45, ha="right")
+        plt.tight_layout()
         st.pyplot(fig_volume)
 
-        # Grafico comparativo per il rapporto S/L complessivo
+        # Grafico rapporti S/L
         fig_sl_ratio, ax_sl_ratio = plt.subplots(figsize=(10, 6))
         ax_sl_ratio.bar(overall_df["Source"], overall_df["S/L Ratio"], color="purple")
         ax_sl_ratio.set_xlabel("Sources")
         ax_sl_ratio.set_ylabel("Overall S/L Ratio")
         ax_sl_ratio.set_title("Overall S/L Ratio Comparison")
         ax_sl_ratio.set_xticklabels(overall_df["Source"], rotation=45, ha="right")
+        plt.tight_layout()
         st.pyplot(fig_sl_ratio)
 
-    # Radar Chart
+def create_radar_chart(mass_volume_df):
+    """
+    Crea il radar chart per i rapporti massa/volume.
+    """
     st.markdown("### Radar Chart (Spider Plot) for Mass/Volume Ratios")
     fig, ax = plt.subplots(figsize=(12, 8), subplot_kw=dict(polar=True))
 
-    # Filter out rows with zero ratios and duplicates
+    # Filtra i dati validi
     valid_data = mass_volume_df[mass_volume_df["S/L Ratio"] > 0].drop_duplicates()
-
-    # Get unique phase-liquid combinations
     phases_liquids = valid_data[["Phase", "Liquid Type"]].drop_duplicates().values.tolist()
 
     if not phases_liquids:
         st.error("No valid phase/liquid combinations found with non-zero ratios.")
         return
 
-    # Prepare angles
+    # Prepara gli angoli
     num_vars = len(phases_liquids)
     angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
-    angles += angles[:1]  # Complete the circle
+    angles += angles[:1]
 
-    # Use different colors for different sources
+    # Colori diversi per le diverse fonti
     colors = plt.cm.Set3(np.linspace(0, 1, len(valid_data["Source"].unique())))
 
     for idx, source in enumerate(valid_data["Source"].unique()):
@@ -2001,9 +1997,8 @@ def benchmarking():
             ratio = ratio[0] if len(ratio) > 0 else 0
             data.append(ratio)
 
-        data += data[:1]  # Complete the circle
+        data += data[:1]
 
-        # Different styles for scenarios and literature
         if "Literature" in source:
             linestyle = '--'
             alpha = 0.15
@@ -2015,36 +2010,27 @@ def benchmarking():
                 color=colors[idx], linestyle=linestyle)
         ax.fill(angles, data, alpha=alpha, color=colors[idx])
 
-    # Improve labels
+    # Migliora le etichette
     labels = [f"{phase}\n({liquid})" for phase, liquid in phases_liquids]
     ax.set_xticks(angles[:-1])
     ax.set_xticklabels(labels, fontsize=8)
 
-    # Add title and legend
     plt.title("Mass/Volume Ratios by Phase and Liquid\n(Solid lines: Scenarios, Dashed lines: Literature)",
               pad=20, fontsize=10)
     plt.legend(loc='center left', bbox_to_anchor=(1.2, 0.5),
                fontsize=8, title="Sources")
 
-    # Add grid and adjust layout
     ax.grid(True, alpha=0.2)
     plt.tight_layout()
-
-    # Show the plot
     st.pyplot(fig)
 
-    # Add explanatory note
-    st.info("""
-    The radar chart above shows the S/L ratios for different phases and liquids.
-    - Solid lines represent scenarios
-    - Dashed lines represent literature case studies
-    - The further a point is from the center, the higher the S/L ratio
-    - Zero ratios are excluded for better visualization
-    """)
-    # --- Confronto tra Scenari ---
+def create_scenario_comparison(mass_volume_df):
+    """
+    Crea la sezione di confronto tra scenari con statistiche aggregate.
+    """
     st.markdown("### Scenario Comparison")
 
-    # Confronto basato su masse, volumi e rapporti medi S/L
+    # Calcola le statistiche aggregate per ogni fonte
     scenario_data = {}
     for source in mass_volume_df["Source"].unique():
         source_df = mass_volume_df[mass_volume_df["Source"] == source]
@@ -2058,10 +2044,11 @@ def benchmarking():
             "Average S/L Ratio": avg_ratio
         }
 
+    # Crea e mostra la tabella di confronto
     comparison_df = pd.DataFrame(scenario_data).T.reset_index().rename(columns={"index": "Source"})
     st.table(comparison_df)
 
-    # Grafico per confrontare i valori medi di massa, volume e rapporto
+    # Crea il grafico della media dei rapporti S/L
     if not comparison_df.empty:
         fig_comparison, ax_comparison = plt.subplots(figsize=(10, 6))
         ax_comparison.bar(comparison_df["Source"], comparison_df["Average S/L Ratio"], color="cyan")
@@ -2069,17 +2056,98 @@ def benchmarking():
         ax_comparison.set_ylabel("Average S/L Ratio")
         ax_comparison.set_title("Average Solid/Liquid Ratio Comparison")
         ax_comparison.set_xticklabels(comparison_df["Source"], rotation=45, ha="right")
+        plt.tight_layout()
         st.pyplot(fig_comparison)
 
+def benchmarking():
+    """
+    Funzione principale per il benchmarking che confronta scenari e case studies.
+    """
+    st.title("Benchmarking: Unified Comparison Across Scenarios and Literature")
+
+    # Selezione delle fonti
+    selected_scenarios = st.multiselect(
+        "Select Scenarios to Compare:",
+        list(st.session_state.amelie_scenarios.keys()),
+        default=["default"]
+    )
+
+    selected_case_studies = st.multiselect(
+        "Select Literature Case Studies to Compare:",
+        list(st.session_state.case_studies.keys())
+    )
+
+    # Prepara le fonti
+    sources = []
+    for scenario_name in selected_scenarios:
+        sources.append({
+            "name": scenario_name,
+            "type": "Scenario",
+            "data": st.session_state.amelie_scenarios.get(scenario_name, {})
+        })
+
+    for case_study_name in selected_case_studies:
+        sources.append({
+            "name": case_study_name,
+            "type": "Literature",
+            "data": st.session_state.case_studies.get(case_study_name, {})
+        })
+
+    if not sources:
+        st.warning("Please select at least one scenario or case study to compare.")
+        return
+
+    # Processa i dati
+    all_ratios = []
+    for source in sources:
+        ratios = process_source_data(source["name"], source["type"], source["data"])
+        all_ratios.extend(ratios)
+
+    # Crea il DataFrame principale
+    mass_volume_df = pd.DataFrame(all_ratios)
+
+    if not mass_volume_df.empty:
+        # Mostra dati processati per debug
+        st.write("Complete processed data:")
+        st.write(mass_volume_df)
+
+        st.write("\nUnique sources in the data:")
+        st.write(mass_volume_df["Source"].unique())
+
+        # Crea le tabelle per fase
+        create_phase_specific_tables(mass_volume_df)
+
+        # Crea la tabella di confronto complessiva
+        create_overall_comparison_table(mass_volume_df)
+
+        # Crea i grafici di confronto
+        create_comparison_charts(mass_volume_df)
+
+        # Crea il radar chart
+        create_radar_chart(mass_volume_df)
+
+        # Crea la sezione di confronto tra scenari
+        create_scenario_comparison(mass_volume_df)
+
+        # Mostra la nota esplicativa
+        st.info("""
+        Il radar chart mostra i rapporti S/L per diverse fasi e liquidi.
+        - Le linee continue rappresentano gli scenari
+        - Le linee tratteggiate rappresentano i case studies dalla letteratura
+        - Più un punto è lontano dal centro, più alto è il rapporto S/L
+        - I rapporti zero sono esclusi per una migliore visualizzazione
+        """)
+    else:
+        st.warning("No data available for comparison. Please select at least one scenario or case study.")
 
 if page == "Economic KPIs":
-    economic_kpis()
+  economic_kpis()
 elif page == "Technical KPIs":
-    technical_kpis()
+  technical_kpis()
 elif page == "Literature":
-    literature()
+  literature()
 elif page == "Benchmarking":
-    benchmarking()
+  benchmarking()
 
 
 
