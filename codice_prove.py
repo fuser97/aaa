@@ -1776,29 +1776,52 @@ def benchmarking():
     phase_data = []  # Dati per confronto fase/liquido
     overall_data = []  # Dati complessivi per confronto generale
 
-    # Itera sulle fonti (scenari e studi)
-    mass_volume_ratios = []  # Lista per raccogliere i dati
-    # Inside the benchmarking function, modify the data collection part:
+    # Modifica della parte di raccolta dati nel benchmarking
 
-    # Modify the phase data collection loop
+    mass_volume_ratios = []  # Lista per raccogliere i dati
+
     for source in sources:
         source_name = source["name"]
         source_type = source["type"]
         source_data = source["data"]
 
+        # Debug print
+        st.write(f"Processing source: {source_type}: {source_name}")
+
         # Get the technical KPIs data
         tech_kpis = source_data.get("technical_kpis", {})
         phases = tech_kpis.get("phases", {})
 
+        # Debug print
+        st.write(f"Found phases: {list(phases.keys())}")
+
+        if not phases and source_type == "Scenario":
+            # Se non ci sono fasi nei technical_kpis, prova a cercare direttamente nello scenario
+            if "phases" in source_data:
+                phases = source_data["phases"]
+                st.write("Using phases directly from scenario data")
+
+        # Debug print
+        st.write(f"Processing phases: {list(phases.keys())}")
+
         for phase_name, phase_data in phases.items():
+            # Debug print
+            st.write(f"\nProcessing phase: {phase_name}")
+            st.write(f"Phase data: {phase_data}")
+
             # Get mass data - handle both dictionary and direct value formats
             if isinstance(phase_data.get("masses", {}), dict):
                 total_mass = sum(phase_data.get("masses", {}).values())
             else:
                 total_mass = phase_data.get("mass", 0)
 
+            # Debug print
+            st.write(f"Total mass for phase: {total_mass}")
+
             # Get liquids data - handle both list and dictionary formats
             liquids = phase_data.get("liquids", [])
+            st.write(f"Liquids data: {liquids}")
+
             if isinstance(liquids, list):
                 # Handle list format
                 for liquid in liquids:
@@ -1855,6 +1878,14 @@ def benchmarking():
                 "S/L Ratio": overall_ratio
             })
 
+    # Converti in DataFrame e mostra i dati processati
+    mass_volume_df = pd.DataFrame(mass_volume_ratios)
+    st.write("Processed Data:")
+    st.write(mass_volume_df)
+
+    # Verifica le sorgenti uniche nel DataFrame
+    st.write("\nUnique sources in the data:")
+    st.write(mass_volume_df["Source"].unique())
     # Debug output
     st.write("Processed Data:")
     debug_df = pd.DataFrame(mass_volume_ratios)
