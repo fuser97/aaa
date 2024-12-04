@@ -885,7 +885,7 @@ def technical_kpis():
             if new_phase_name and new_phase_name not in st.session_state.phases:
                 st.session_state.phases[new_phase_name] = {"liquids": [], "mass": 0.0}
                 st.success(f"Phase '{new_phase_name}' added.")
-                st.experimental_rerun()
+                st.experimental_rerun()  # Ricarica per mostrare la nuova fase
             else:
                 st.error("Phase name is invalid or already exists!")
 
@@ -897,7 +897,7 @@ def technical_kpis():
             if st.button(f"Remove Phase '{phase_name}'", key=f"remove_phase_{phase_name}"):
                 del st.session_state.phases[phase_name]
                 st.success(f"Phase '{phase_name}' removed.")
-                st.experimental_rerun()
+                st.stop()  # Interrompi l'esecuzione per evitare problemi con il rerun
 
             # Modifica massa della fase
             phase_mass = st.number_input(
@@ -922,13 +922,13 @@ def technical_kpis():
                     )
                 with col3:
                     if st.button(f"Remove {liquid['type']}", key=f"remove_liquid_{phase_name}_{idx}"):
-                        continue
+                        continue  # Salta al prossimo liquido se viene rimosso
 
                 updated_liquids.append({"type": liquid_type, "volume": liquid_volume})
 
             updated_phases[phase_name] = {"liquids": updated_liquids, "mass": phase_mass}
 
-        # Salvataggio dei dati
+        # Salvataggio dei dati aggiornati
         st.session_state.phases = updated_phases
 
         # Calcolo dei rapporti solidi/liquidi
