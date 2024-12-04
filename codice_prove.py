@@ -1769,6 +1769,76 @@ def benchmarking():
         ax_material.set_xticklabels(efficiency_df["Source"], rotation=45, ha="right")
         st.pyplot(fig_material)
 
+    # Confronto massa/volume per fase
+    st.markdown("### Solid/Liquid Ratios Comparison: Per Phase and Overall")
+
+    # Raccogli i dati per il confronto
+    phase_data = []  # Dati per confronto fase/liquido
+    overall_data = []  # Dati complessivi per confronto generale
+
+    for source in sources:
+        source_name = source["name"]
+        source_type = source["type"]
+        source_data = source["data"]
+
+        # Recupera le fasi
+        phases = source_data.get("technical_kpis", {}).get("phases", {})
+        for phase_name, phase_info in phases.items():
+            phase_mass = phase_info.get("mass", 0)
+            liquids = phase_info.get("liquids", [])
+
+            if not isinstance(liquids, list):  # Assicurati che i liquidi siano una lista
+                st.warning(f"Invalid data format for liquids in phase '{phase_name}' from source '{source_name}'.")
+                liquids = []
+
+            # Itera sui liquidi per calcolare e raccogliere i dati
+            for liquid in liquids:
+                liquid_type = liquid.get("type", "Unknown")
+                liquid_volume = liquid.get("volume", 0)
+                sl_ratio = phase_mass / liquid_volume if liquid_volume > 0 else 0
+
+                phase_data.append({
+                    "Source": f"{source_type}: {source_name}",
+                    "Phase": phase_name,
+                    "Liquid Type": liquid_type,
+                    "Mass (kg)": phase_mass,
+                    "Volume (L)": liquid_volume,
+                    "S/L Ratio": sl_ratio
+                })
+
+        # Calcolo complessivo per la fonte
+        total_mass = sum(phase_info.get("mass", 0) for phase_info in phases.values())
+        total_volume = sum(
+            sum(liquid.get("volume", 0) for liquid in phase_info.get("liquids", []))
+            for phase_info in phases.values()
+        )
+        overall_sl_ratio = total_mass / total_volume if total_volume > 0 else 0
+
+        overall_data.append({
+            "Source": f"{source_type}: {source_name}",
+            "Total Mass (kg)": total_mass,
+            "Total Volume (L)": total_volume,
+            "Overall S/L Ratio": overall_sl_ratio
+        })
+
+    # Converti i dati in DataFrame
+    phase_df = pd.DataFrame(phase_data)
+    overall_df = pd.DataFrame(overall_data)
+
+    # --- Confronto per fase/liquido ---
+    st.markdown("#### Phase-Specific Solid/Liquid Ratios Table")
+    # Confronta per fase e tipo di liquido
+    if not phase_df.empty:
+        for phase_name in phase_df["Phase"].unique():
+            st.markdown(f"##### Phase: {phase_name}")
+            phase_specific_df = phase_df[phase_df["Phase"] == phase_name]
+            st.table(phase_specific_df.pivot_table(
+                index=["Liquid Type"],
+                columns=["Source"],
+                values=["Mass (kg)", "Volume (L)", "S/L Ratio"],
+                aggfunc="first"
+            ))
+
     # --- Confronto complessivo ---
     st.markdown("#### Overall Solid/Liquid Ratios Table")
     st.table(overall_df)
@@ -2005,6 +2075,8 @@ def benchmarking():
         ax.set_title("Mass/Volume Ratios by Phase and Liquid")
         ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1))
         st.pyplot(fig)
+
+
 if page == "Economic KPIs":
     economic_kpis()
 elif page == "Technical KPIs":
