@@ -1373,8 +1373,26 @@ def literature():
                 phases = technical_kpis.get("phases", {})
                 updated_phases = {}
 
+                # Aggiungi una nuova fase
+                new_phase_name = st.text_input("New Phase Name:", key="new_phase_name")
+                if st.button("Add Phase"):
+                    if new_phase_name and new_phase_name not in st.session_state.phases:
+                        st.session_state.phases[new_phase_name] = {"liquids": [], "mass": 0.0}
+                        st.success(f"Phase '{new_phase_name}' added.")
+                        st.experimental_rerun()
+                    else:
+                        st.error("Phase name is invalid or already exists!")
+
                 for phase_name, phase_data in phases.items():
                     st.subheader(f"Phase: {phase_name}")
+
+                    # Pulsante per rimuovere la fase
+                    if st.button(f"Remove Phase '{phase_name}'", key=f"remove_phase_{phase_name}"):
+                        del st.session_state.phases[phase_name]
+                        st.success(f"Phase '{phase_name}' removed.")
+                        st.experimental_rerun()
+
+                    # (Resto del codice esistente per gestire i dati della fase)
 
                     # Massa per la fase
                     masses = phase_data.get("masses", {})
@@ -2079,3 +2097,8 @@ elif page == "Literature":
     literature()
 elif page == "Benchmarking":
     benchmarking()
+
+
+
+
+
