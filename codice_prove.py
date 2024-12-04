@@ -865,10 +865,10 @@ def technical_kpis():
         save_amelie_scenarios()
         st.success("Material and Efficiency data saved successfully!")
 
-    # Solid/Liquid Ratios Section
     elif selected_section == "Solid/Liquid Ratios":
         st.subheader("Solid/Liquid Ratios for Each Phase")
 
+        # Inizializzazione delle fasi
         if "phases" not in st.session_state:
             st.session_state.phases = {
                 "Leaching in Water": {"liquids": [{"type": "Water", "volume": 20.0}], "mass": 5.0},
@@ -879,15 +879,35 @@ def technical_kpis():
         phases = st.session_state.phases
         updated_phases = {}
 
+        # Aggiungi una nuova fase
+        new_phase_name = st.text_input("New Phase Name:", key="new_phase_name")
+        if st.button("Add Phase"):
+            if new_phase_name and new_phase_name not in st.session_state.phases:
+                st.session_state.phases[new_phase_name] = {"liquids": [], "mass": 0.0}
+                st.success(f"Phase '{new_phase_name}' added.")
+                st.experimental_rerun()
+            else:
+                st.error("Phase name is invalid or already exists!")
+
+        # Itera sulle fasi esistenti
         for phase_name, phase_data in phases.items():
             st.subheader(f"Phase: {phase_name}")
-            liquids = phase_data.get("liquids", [])
-            updated_liquids = []
 
+            # Pulsante per rimuovere la fase
+            if st.button(f"Remove Phase '{phase_name}'", key=f"remove_phase_{phase_name}"):
+                del st.session_state.phases[phase_name]
+                st.success(f"Phase '{phase_name}' removed.")
+                st.experimental_rerun()
+
+            # Modifica massa della fase
             phase_mass = st.number_input(
                 f"Mass for {phase_name} (kg):", min_value=0.0, value=phase_data.get("mass", 0.0), step=0.1,
                 key=f"mass_{phase_name}"
             )
+
+            # Modifica liquidi della fase
+            liquids = phase_data.get("liquids", [])
+            updated_liquids = []
 
             for idx, liquid in enumerate(liquids):
                 col1, col2, col3 = st.columns([2, 1, 1])
@@ -901,15 +921,17 @@ def technical_kpis():
                         key=f"volume_{phase_name}_{idx}"
                     )
                 with col3:
-                    if st.button(f"Remove {liquid['type']}", key=f"remove_{phase_name}_{idx}"):
+                    if st.button(f"Remove {liquid['type']}", key=f"remove_liquid_{phase_name}_{idx}"):
                         continue
 
                 updated_liquids.append({"type": liquid_type, "volume": liquid_volume})
 
             updated_phases[phase_name] = {"liquids": updated_liquids, "mass": phase_mass}
 
+        # Salvataggio dei dati
         st.session_state.phases = updated_phases
 
+        # Calcolo dei rapporti solidi/liquidi
         sl_results = []
         for phase_name, phase_data in st.session_state.phases.items():
             phase_mass = phase_data["mass"]
