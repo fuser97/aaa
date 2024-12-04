@@ -10,6 +10,21 @@ import json
 import os
 import numpy as np
 
+def sanitize_phase_data(phase_mass, liquid_volume):
+    """
+    Sanitizza i dati di massa e volume, garantendo che siano numerici.
+    """
+    try:
+        phase_mass = float(phase_mass) if isinstance(phase_mass, (int, float)) else 0
+    except ValueError:
+        phase_mass = 0  # Imposta un valore di fallback
+
+    try:
+        liquid_volume = float(liquid_volume) if isinstance(liquid_volume, (int, float)) else 0
+    except ValueError:
+        liquid_volume = 0  # Imposta un valore di fallback
+
+    return phase_mass, liquid_volume
 
 def sanitize_liquids(liquids, default_type="Unknown", default_volume=0.0):
     """
@@ -1813,19 +1828,22 @@ def benchmarking():
             sanitized_liquids = sanitize_liquids(liquids)
             phase_info["liquids"] = sanitized_liquids  # Aggiorna con i dati sanitizzati
 
-            # Itera sui liquidi per calcolare e raccogliere i dati
-            for liquid in liquids:
-                if not isinstance(liquid, dict):  # Controllo se l'elemento è un dizionario
-                    st.warning(f"Invalid liquid format in phase '{phase_name}' from source '{source_name}': {liquid}")
-                    continue  # Salta l'elemento non valido
-                liquid_type = liquid.get("type", "Unknown")
-                liquid_volume = liquid.get("volume", 0)
+            # Itera sui liquidi sanitizzati per calcolare il rapporto S/L
+            for liquid in sanitized_liquids:
+                # Sanitizza i dati di massa e volume
+                phase_mass, liquid_volume = sanitize_phase_data(
+                    phase_info.get("mass", 0),
+                    liquid.get("volume", 0)
+                )
+
+                # Calcola il rapporto solo se liquid_volume > 0
                 sl_ratio = phase_mass / liquid_volume if liquid_volume > 0 else 0
 
+                # Aggiungi al dataset
                 phase_data.append({
                     "Source": f"{source_type}: {source_name}",
                     "Phase": phase_name,
-                    "Liquid Type": liquid_type,
+                    "Liquid Type": liquid.get("type", "Unknown"),
                     "Mass (kg)": phase_mass,
                     "Volume (L)": liquid_volume,
                     "S/L Ratio": sl_ratio
