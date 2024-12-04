@@ -1793,9 +1793,6 @@ def benchmarking():
 
             # Itera sui liquidi per calcolare e raccogliere i dati
             for liquid in liquids:
-                if not isinstance(liquid, dict):  # Controllo se l'elemento è un dizionario
-                    st.warning(f"Invalid liquid format in phase '{phase_name}' from source '{source_name}': {liquid}")
-                    continue  # Salta l'elemento non valido
                 liquid_type = liquid.get("type", "Unknown")
                 liquid_volume = liquid.get("volume", 0)
                 sl_ratio = phase_mass / liquid_volume if liquid_volume > 0 else 0
@@ -1811,11 +1808,10 @@ def benchmarking():
 
         # Calcolo complessivo per la fonte
         total_mass = sum(phase_info.get("mass", 0) for phase_info in phases.values())
-        if phase_info and isinstance(phase_info.get("liquids", []), list):
-            total_volume = sum(liquid.get("volume", 0) for liquid in phase_info["liquids"])
-        else:
-            total_volume = 0
-
+        total_volume = sum(
+            sum(liquid.get("volume", 0) for liquid in phase_info.get("liquids", []))
+            for phase_info in phases.values()
+        )
         overall_sl_ratio = total_mass / total_volume if total_volume > 0 else 0
 
         overall_data.append({
@@ -1896,9 +1892,7 @@ def benchmarking():
         phases = source_data["technical_kpis"]["phases"]
 
         # Processa i dati relativi al rapporto massa/volume per ogni fase
-        if "liquids" not in phase_data or not isinstance(phase_data["liquids"], list):
-            st.warning(f"Fixing invalid liquids data in phase '{phase_name}' from source '{source_name}'.")
-            phases[phase_name]["liquids"] = []  # Inizializza come lista vuota
+        for phase_name, phase_data in phases.items():
             # Recupera la massa totale per la fase
             total_mass = phase_data.get("mass", 0)
 
@@ -2082,7 +2076,6 @@ def benchmarking():
         ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1))
         st.pyplot(fig)
 
-        st.write(f"Debugging phase '{phase_name}' in source '{source_name}':", phase_info)
 
 if page == "Economic KPIs":
     economic_kpis()
