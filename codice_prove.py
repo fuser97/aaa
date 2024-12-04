@@ -273,7 +273,16 @@ if "case_studies" not in st.session_state:
 
 # Initialize session state for case studies
 if "case_studies" not in st.session_state:
-    st.session_state.case_studies = {}
+    if os.path.exists(case_studies_file):
+        with open(case_studies_file, "r") as file:
+            try:
+                st.session_state.case_studies = json.load(file)
+            except json.JSONDecodeError:
+                st.warning("Invalid JSON structure in case studies file. Starting with an empty state.")
+                st.session_state.case_studies = {}
+    else:
+        st.session_state.case_studies = {}
+
 
 # Carica il valore di amelie_energy_cost se il file esiste
 if os.path.exists("amelie_config.json"):
@@ -1988,7 +1997,3 @@ elif page == "Literature":
     literature()
 elif page == "Benchmarking":
     benchmarking()
-
-
-
-
