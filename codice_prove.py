@@ -1923,32 +1923,90 @@ def benchmarking():
     st.markdown("### Radar Chart (Spider Plot) for Mass/Volume Ratios")
     fig, ax = plt.subplots(figsize=(8, 8), subplot_kw=dict(polar=True))
 
-    # Prepara gli angoli per il radar chart
-    phases_liquids = mass_volume_df[["Phase", "Liquid Type"]].drop_duplicates().values.tolist()
+    # Ensure mass_volume_df includes both scenarios and literature data
+    # First, let's debug the data
+    st.write("Debug: Available sources in the data:")
+    st.write(mass_volume_df["Source"].unique())
+    st.write("\nDebug: Sample of phases and liquid types:")
+    st.write(mass_volume_df[["Source", "Phase", "Liquid Type", "S/L Ratio"]].head())
+
+    # Prepare angles for the radar chart
+    # Filter out None/NaN values
+    phases_liquids = mass_volume_df[
+        mass_volume_df["Phase"].notna() &
+        mass_volume_df["Liquid Type"].notna()
+        ][["Phase", "Liquid Type"]].drop_duplicates().values.tolist()
+
+    if not phases_liquids:
+        st.error("No valid phase/liquid combinations found in the data.")
+        return
+
     num_vars = len(phases_liquids)
     angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
     angles += angles[:1]
 
-    for source in mass_volume_df["Source"].unique():
-        source_data = mass_volume_df[mass_volume_df["Source"] == source]
-        data = [
-            source_data[
-                (source_data["Phase"] == phase) & (source_data["Liquid Type"] == liquid)
-                ]["S/L Ratio"].sum()
-            for phase, liquid in phases_liquids
-        ]
-        data += data[:1]
-        ax.plot(angles, data, label=source, linewidth=2)
-        ax.fill(angles, data, alpha=0.25)
+    # Create radar chart with different colors for scenarios and literature
+    colors = plt.cm.Set3(np.linspace(0, 1, len(mass_volume_df["Source"].unique())))
 
+    for idx, source in enumerate(mass_volume_df["Source"].unique()):
+        source_data = mass_volume_df[mass_volume_df["Source"] == source]
+
+        # Debug information
+        st.write(f"\nProcessing source: {source}")
+        st.write(f"Number of data points: {len(source_data)}")
+
+        data = []
+        for phase, liquid in phases_liquids:
+            ratio = source_data[
+                (source_data["Phase"] == phase) &
+                (source_data["Liquid Type"] == liquid)
+                ]["S/L Ratio"].sum()
+            data.append(ratio)
+
+            # Debug information for each phase/liquid combination
+            st.write(f"Phase: {phase}, Liquid: {liquid}, Ratio: {ratio}")
+
+        data += data[:1]  # Close the polygon
+
+        # Plot with different line styles for scenarios and literature
+        if "Literature" in source:
+            linestyle = '--'  # Dashed line for literature
+            alpha = 0.15  # Lower alpha for literature
+        else:
+            linestyle = '-'  # Solid line for scenarios
+            alpha = 0.25
+
+        ax.plot(angles, data, label=source, linewidth=2,
+                color=colors[idx], linestyle=linestyle)
+        ax.fill(angles, data, alpha=alpha, color=colors[idx])
+
+    # Improve label formatting and placement
     labels = [f"{phase}\n({liquid})" for phase, liquid in phases_liquids]
     ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(labels, fontsize=10)
+    ax.set_xticklabels(labels, fontsize=8)
 
-    ax.set_title("Mass/Volume Ratios by Phase and Liquid")
-    ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1))
+    # Improve the layout
+    ax.set_title("Mass/Volume Ratios by Phase and Liquid\n(Solid lines: Scenarios, Dashed lines: Literature)",
+                 pad=20, fontsize=10)
+
+    # Adjust legend
+    ax.legend(loc='center left', bbox_to_anchor=(1.2, 0.5),
+              fontsize=8, title="Sources")
+
+    # Add gridlines
+    ax.grid(True, alpha=0.2)
+
+    # Make the plot more readable
+    plt.tight_layout()
     st.pyplot(fig)
 
+    # Add a note about the visualization
+    st.info("""
+    The radar chart above shows the S/L ratios for different phases and liquids.
+    - Solid lines represent scenarios
+    - Dashed lines represent literature case studies
+    - The further a point is from the center, the higher the S/L ratio
+    """)
     # --- Confronto tra Scenari ---
     st.markdown("### Scenario Comparison")
 
