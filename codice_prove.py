@@ -1613,161 +1613,6 @@ if len(compare_scenarios) > 1:
     st.table(comparison_df)
 
 
-def benchmarking():
-    st.title("Benchmarking: Unified Comparison Across Scenarios and Literature")
-
-    # Selezione delle fonti (scenari e letteratura)
-    selected_scenarios = st.multiselect(
-        "Select Scenarios to Compare:",
-        list(st.session_state.amelie_scenarios.keys()),
-        default=["default"],
-        key="benchmarking_scenarios"
-    )
-    selected_case_studies = st.multiselect(
-        "Select Literature Case Studies to Compare:",
-        list(st.session_state.case_studies.keys()),
-        key="benchmarking_case_studies"
-    )
-
-    # Unifica scenari e letteratura in un'unica lista
-    sources = []
-
-    # Aggiungi gli scenari
-    for scenario_name in selected_scenarios:
-        scenario_data = st.session_state.amelie_scenarios.get(scenario_name, {})
-        sources.append({
-            "name": scenario_name,
-            "type": "Scenario",
-            "data": scenario_data
-        })
-
-    # Aggiungi i casi di letteratura
-    for case_study_name in selected_case_studies:
-        case_study_data = st.session_state.case_studies.get(case_study_name, {})
-        sources.append({
-            "name": case_study_name,
-            "type": "Literature",
-            "data": case_study_data
-        })
-
-    # Confronto dei KPI economici
-    st.markdown("### Economic KPI Comparison: CapEx and OpEx")
-
-    # Raccogli i dati per CapEx e OpEx
-    economic_data_capex = []
-    economic_data_opex = []
-
-    for source in sources:
-        source_name = source["name"]
-        source_type = source["type"]
-        source_data = source["data"]
-
-        # Calcolo totale CapEx
-        total_capex = sum(source_data.get("capex", {}).values())
-        economic_data_capex.append({
-            "Source": f"{source_type}: {source_name}",
-            "CapEx (EUR)": total_capex
-        })
-
-        # Calcolo totale OpEx
-        total_opex = sum(source_data.get("opex", {}).values())
-        economic_data_opex.append({
-            "Source": f"{source_type}: {source_name}",
-            "OpEx (EUR)": total_opex
-        })
-
-    # Converti i dati in DataFrame per la visualizzazione
-    capex_df = pd.DataFrame(economic_data_capex)
-    opex_df = pd.DataFrame(economic_data_opex)
-
-    # Visualizza le tabelle
-    st.markdown("#### CapEx Comparison Table")
-    st.table(capex_df)
-
-    st.markdown("#### OpEx Comparison Table")
-    st.table(opex_df)
-
-    # Visualizza il grafico per CapEx
-    st.markdown("#### CapEx Comparison Chart")
-    fig_capex, ax_capex = plt.subplots(figsize=(10, 6))
-    ax_capex.bar(capex_df["Source"], capex_df["CapEx (EUR)"], color='blue')
-    ax_capex.set_xlabel("Sources")
-    ax_capex.set_ylabel("CapEx (EUR)")
-    ax_capex.set_title("CapEx Comparison")
-    ax_capex.set_xticklabels(capex_df["Source"], rotation=45, ha="right")
-    st.pyplot(fig_capex)
-
-    # Visualizza il grafico per OpEx
-    st.markdown("#### OpEx Comparison Chart")
-    fig_opex, ax_opex = plt.subplots(figsize=(10, 6))
-    ax_opex.bar(opex_df["Source"], opex_df["OpEx (EUR)"], color='green')
-    ax_opex.set_xlabel("Sources")
-    ax_opex.set_ylabel("OpEx (EUR)")
-    ax_opex.set_title("OpEx Comparison")
-    ax_opex.set_xticklabels(opex_df["Source"], rotation=45, ha="right")
-    st.pyplot(fig_opex)
-
-    # Confronto delle efficienze (overall e per materiale)
-    st.markdown("### Efficiency Comparison: Overall and Per Material")
-
-    # Raccogli i dati per l'efficienza
-    efficiency_data = []
-    materials = set()  # Per raccogliere tutti i tipi di materiale unici
-
-    for source in sources:
-        source_name = source["name"]
-        source_type = source["type"]
-        source_data = source["data"]
-
-        # Recupera l'efficienza totale
-        overall_efficiency = source_data.get("technical_kpis", {}).get("efficiency", 0)
-
-        # Recupera le efficienze per materiale
-        material_efficiencies = source_data.get("technical_kpis", {}).get("composition", {})
-        recovered_masses = source_data.get("technical_kpis", {}).get("recovered_masses", {})
-        material_efficiency_data = {}
-
-        for material, percentage in material_efficiencies.items():
-            initial_mass = percentage / 100  # Percentuale in termini di frazione
-            recovered_mass = recovered_masses.get(material, 0)
-            efficiency = (recovered_mass / initial_mass) * 100 if initial_mass > 0 else 0
-            material_efficiency_data[material] = efficiency
-            materials.add(material)
-
-        # Aggiungi al dataset
-        efficiency_data.append({
-            "Source": f"{source_type}: {source_name}",
-            "Overall Efficiency (%)": overall_efficiency,
-            **material_efficiency_data
-        })
-
-    # Converti i dati in DataFrame per il confronto
-    efficiency_df = pd.DataFrame(efficiency_data).fillna(0)
-
-    # Visualizza la tabella per l'efficienza totale
-    st.markdown("#### Overall Efficiency Table")
-    st.table(efficiency_df[["Source", "Overall Efficiency (%)"]])
-
-    # Visualizza un grafico a barre per l'efficienza totale
-    st.markdown("#### Overall Efficiency Chart")
-    fig_overall, ax_overall = plt.subplots(figsize=(10, 6))
-    ax_overall.bar(efficiency_df["Source"], efficiency_df["Overall Efficiency (%)"], color="purple")
-    ax_overall.set_xlabel("Sources")
-    ax_overall.set_ylabel("Overall Efficiency (%)")
-    ax_overall.set_title("Overall Efficiency Comparison")
-    ax_overall.set_xticklabels(efficiency_df["Source"], rotation=45, ha="right")
-    st.pyplot(fig_overall)
-
-    # Visualizza i grafici a barre per i materiali
-    for material in sorted(materials):
-        st.markdown(f"#### Efficiency Comparison for {material}")
-        fig_material, ax_material = plt.subplots(figsize=(10, 6))
-        ax_material.bar(efficiency_df["Source"], efficiency_df.get(material, 0), color="orange")
-        ax_material.set_xlabel("Sources")
-        ax_material.set_ylabel(f"Efficiency for {material} (%)")
-        ax_material.set_title(f"{material} Efficiency Comparison")
-        ax_material.set_xticklabels(efficiency_df["Source"], rotation=45, ha="right")
-        st.pyplot(fig_material)
 
 def process_source_data(source_name, source_type, source_data):
     """
@@ -2097,7 +1942,67 @@ def benchmarking():
         st.warning("Please select at least one scenario or case study to compare.")
         return
 
-    # Processa i dati
+    # PARTE 1: KPI ECONOMICI
+    st.markdown("### Economic KPI Comparison: CapEx and OpEx")
+
+    # Raccogli i dati per CapEx e OpEx
+    economic_data_capex = []
+    economic_data_opex = []
+
+    for source in sources:
+        source_name = source["name"]
+        source_type = source["type"]
+        source_data = source["data"]
+
+        # Calcolo totale CapEx
+        total_capex = sum(source_data.get("capex", {}).values())
+        economic_data_capex.append({
+            "Source": f"{source_type}: {source_name}",
+            "CapEx (EUR)": total_capex
+        })
+
+        # Calcolo totale OpEx
+        total_opex = sum(source_data.get("opex", {}).values())
+        economic_data_opex.append({
+            "Source": f"{source_type}: {source_name}",
+            "OpEx (EUR)": total_opex
+        })
+
+    # Converti i dati in DataFrame per la visualizzazione
+    capex_df = pd.DataFrame(economic_data_capex)
+    opex_df = pd.DataFrame(economic_data_opex)
+
+    # Visualizza le tabelle
+    st.markdown("#### CapEx Comparison Table")
+    st.table(capex_df)
+
+    st.markdown("#### OpEx Comparison Table")
+    st.table(opex_df)
+
+    # Visualizza il grafico per CapEx
+    st.markdown("#### CapEx Comparison Chart")
+    fig_capex, ax_capex = plt.subplots(figsize=(10, 6))
+    ax_capex.bar(capex_df["Source"], capex_df["CapEx (EUR)"], color='blue')
+    ax_capex.set_xlabel("Sources")
+    ax_capex.set_ylabel("CapEx (EUR)")
+    ax_capex.set_title("CapEx Comparison")
+    ax_capex.set_xticklabels(capex_df["Source"], rotation=45, ha="right")
+    plt.tight_layout()
+    st.pyplot(fig_capex)
+
+    # Visualizza il grafico per OpEx
+    st.markdown("#### OpEx Comparison Chart")
+    fig_opex, ax_opex = plt.subplots(figsize=(10, 6))
+    ax_opex.bar(opex_df["Source"], opex_df["OpEx (EUR)"], color='green')
+    ax_opex.set_xlabel("Sources")
+    ax_opex.set_ylabel("OpEx (EUR)")
+    ax_opex.set_title("OpEx Comparison")
+    ax_opex.set_xticklabels(opex_df["Source"], rotation=45, ha="right")
+    plt.tight_layout()
+    st.pyplot(fig_opex)
+
+    # PARTE 2: RATIO E TECHNICAL KPIs
+    # Processa i dati per i ratio
     all_ratios = []
     for source in sources:
         ratios = process_source_data(source["name"], source["type"], source["data"])
@@ -2107,7 +2012,6 @@ def benchmarking():
     mass_volume_df = pd.DataFrame(all_ratios)
 
     if not mass_volume_df.empty:
-        # Mostra dati processati per debug
         st.write("Complete processed data:")
         st.write(mass_volume_df)
 
@@ -2139,7 +2043,6 @@ def benchmarking():
         """)
     else:
         st.warning("No data available for comparison. Please select at least one scenario or case study.")
-
 if page == "Economic KPIs":
   economic_kpis()
 elif page == "Technical KPIs":
