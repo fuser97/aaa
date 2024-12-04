@@ -11,6 +11,25 @@ import os
 import numpy as np
 
 
+def sanitize_liquids(liquids, default_type="Unknown", default_volume=0.0):
+    """
+    Sanitizza una lista di liquidi, forzandola in un formato corretto.
+    Ogni elemento deve essere un dizionario con le chiavi 'type' e 'volume'.
+    """
+    sanitized_liquids = []
+    for liquid in liquids:
+        if not isinstance(liquid, dict):  # Se non è un dizionario, forza a dizionario
+            print(f"Warning: Invalid liquid data found: {liquid}. Forcing to default format.")
+            liquid = {"type": default_type, "volume": default_volume}
+        else:
+            # Aggiungi chiavi mancanti con valori di default
+            liquid.setdefault("type", default_type)
+            liquid.setdefault("volume", default_volume)
+
+        sanitized_liquids.append(liquid)
+    return sanitized_liquids
+
+
 def update_black_mass_value(scenario, new_mass):
     """
     Aggiorna il valore della black mass in tutti i punti necessari dello scenario
@@ -1784,12 +1803,15 @@ def benchmarking():
         # Recupera le fasi
         phases = source_data.get("technical_kpis", {}).get("phases", {})
         for phase_name, phase_info in phases.items():
-            phase_mass = phase_info.get("mass", 0)
+            # Recupera e sanitizza i liquidi
             liquids = phase_info.get("liquids", [])
-
-            if not isinstance(liquids, list):  # Assicurati che i liquidi siano una lista
-                st.warning(f"Invalid data format for liquids in phase '{phase_name}' from source '{source_name}'.")
+            if not isinstance(liquids, list):  # Se non è una lista, forza a lista vuota
+                print(f"Warning: Invalid liquids format in phase '{phase_name}'. Forcing to empty list.")
                 liquids = []
+
+            # Sanitizza i dati
+            sanitized_liquids = sanitize_liquids(liquids)
+            phase_info["liquids"] = sanitized_liquids  # Aggiorna con i dati sanitizzati
 
             # Itera sui liquidi per calcolare e raccogliere i dati
             for liquid in liquids:
