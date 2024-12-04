@@ -885,7 +885,7 @@ def technical_kpis():
             if new_phase_name and new_phase_name not in st.session_state.phases:
                 st.session_state.phases[new_phase_name] = {"liquids": [], "mass": 0.0}
                 st.success(f"Phase '{new_phase_name}' added.")
-                st.experimental_rerun()  # Ricarica per mostrare la nuova fase
+                st.experimental_rerun()
             else:
                 st.error("Phase name is invalid or already exists!")
 
@@ -897,7 +897,7 @@ def technical_kpis():
             if st.button(f"Remove Phase '{phase_name}'", key=f"remove_phase_{phase_name}"):
                 del st.session_state.phases[phase_name]
                 st.success(f"Phase '{phase_name}' removed.")
-                st.stop()  # Interrompi l'esecuzione per evitare problemi con il rerun
+                st.stop()
 
             # Modifica massa della fase
             phase_mass = st.number_input(
@@ -909,8 +909,9 @@ def technical_kpis():
             liquids = phase_data.get("liquids", [])
             updated_liquids = []
 
+            st.markdown(f"**Liquids in {phase_name}**")
             for idx, liquid in enumerate(liquids):
-                col1, col2, col3 = st.columns([2, 1, 1])
+                col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
                 with col1:
                     liquid_type = st.text_input(
                         f"Liquid Type ({liquid['type']}):", value=liquid["type"], key=f"liquid_type_{phase_name}_{idx}"
@@ -922,10 +923,23 @@ def technical_kpis():
                     )
                 with col3:
                     if st.button(f"Remove {liquid['type']}", key=f"remove_liquid_{phase_name}_{idx}"):
-                        continue  # Salta al prossimo liquido se viene rimosso
-
+                        continue  # Salta al prossimo liquido se rimosso
                 updated_liquids.append({"type": liquid_type, "volume": liquid_volume})
 
+            # Aggiungi un nuovo liquido
+            st.markdown(f"**Add a New Liquid to {phase_name}**")
+            new_liquid_type = st.text_input(f"New Liquid Type for {phase_name}:", key=f"new_liquid_type_{phase_name}")
+            new_liquid_volume = st.number_input(
+                f"Volume for New Liquid (L):", min_value=0.0, step=0.1, key=f"new_liquid_volume_{phase_name}"
+            )
+            if st.button(f"Add Liquid to {phase_name}", key=f"add_liquid_{phase_name}"):
+                if new_liquid_type and new_liquid_type not in [liquid["type"] for liquid in updated_liquids]:
+                    updated_liquids.append({"type": new_liquid_type, "volume": new_liquid_volume})
+                    st.success(f"Added new liquid: {new_liquid_type}")
+                else:
+                    st.error("Invalid or duplicate liquid type!")
+
+            # Salva i liquidi aggiornati per la fase
             updated_phases[phase_name] = {"liquids": updated_liquids, "mass": phase_mass}
 
         # Salvataggio dei dati aggiornati
