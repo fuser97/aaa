@@ -1772,65 +1772,26 @@ def benchmarking():
     phase_data = []  # Dati per confronto fase/liquido
     overall_data = []  # Dati complessivi per confronto generale
 
-    # Itera sulle fonti (scenari e studi)
-    mass_volume_ratios = []  # Lista per raccogliere i dati
+    # Elaborazione dei dati per il Radar Chart
+    mass_volume_ratios = []
 
-    for source in sources:
-        source_name = source["name"]
-        source_type = source["type"]
-        source_data = source["data"]
+    # Funzione per processare i dati
+    def process_source_data(source, source_name, source_type):
+        phases = source.get("phases", {})
 
-        # Assicurati che i dati tecnici siano inizializzati
-        source_data.setdefault("technical_kpis", {})
-        source_data["technical_kpis"].setdefault("phases", {})
+        for phase_name, phase_data in phases.items():
+            total_mass = phase_data.get("mass", 0)
+            liquids = phase_data.get("liquids", [])
 
-        # Recupera le fasi
-        phases = source_data["technical_kpis"]["phases"]
-
-        for phase_name, phase_info in phases.items():
-            # Recupera la massa totale per la fase
-            total_mass = phase_info.get("mass", 0)
-
-            # Recupera i dati sui liquidi
-            liquids = phase_info.get("liquids", [])
-
-            # Assicurati che `liquids` sia una lista valida
-            if not isinstance(liquids, list):
-                liquids = []
-            else:
-                liquids = [liquid for liquid in liquids if isinstance(liquid, dict)]
-
-            # Calcola il volume totale dei liquidi
-            total_volume = sum(
-                liquid.get("volume", 0) for liquid in liquids if isinstance(liquid.get("volume", 0), (int, float))
-            )
-
-            # Calcolo rapporto complessivo
-            overall_ratio = total_mass / total_volume if total_volume > 0 else 0
-
-            # Aggiungi i dati complessivi della fase
-            mass_volume_ratios.append({
-                "Source": f"{source_type}: {source_name}",
-                "Phase": phase_name,
-                "Liquid Type": "Overall",
-                "Phase Mass (kg)": total_mass,
-                "Liquid Volume (L)": total_volume,
-                "S/L Ratio": overall_ratio,
-            })
-
-            # Itera sui liquidi per calcolare il rapporto specifico
+            # Gestione dei liquidi
             for liquid in liquids:
                 liquid_type = liquid.get("type", "Unknown")
                 liquid_volume = liquid.get("volume", 0)
 
-                # Verifica che il volume sia valido
-                if not isinstance(liquid_volume, (int, float)):
-                    liquid_volume = 0  # Imposta a 0 se non è valido
-
-                # Calcolo del rapporto massa/volume per il liquido specifico
+                # Calcolo rapporto massa/liquido
                 sl_ratio = total_mass / liquid_volume if liquid_volume > 0 else 0
 
-                # Aggiungi i dati specifici per tipo di liquido
+                # Aggiungi i dati
                 mass_volume_ratios.append({
                     "Source": f"{source_type}: {source_name}",
                     "Phase": phase_name,
@@ -1840,9 +1801,38 @@ def benchmarking():
                     "S/L Ratio": sl_ratio,
                 })
 
-    # Dopo l'iterazione, mass_volume_ratios conterrà i dati per benchmarking
-    mass_volume_df = pd.DataFrame(mass_volume_ratios)
+            # Calcolo complessivo per la fase
+            total_volume = sum(liquid.get("volume", 0) for liquid in liquids)
+            overall_ratio = total_mass / total_volume if total_volume > 0 else 0
 
+            # Aggiungi i dati complessivi
+            mass_volume_ratios.append({
+                "Source": f"{source_type}: {source_name}",
+                "Phase": phase_name,
+                "Liquid Type": "Overall",
+                "Phase Mass (kg)": total_mass,
+                "Liquid Volume (L)": total_volume,
+                "S/L Ratio": overall_ratio,
+            })
+
+    # Processa gli scenari
+    for scenario_name, scenario_data in st.session_state.amelie_scenarios.items():
+        process_source_data(
+            source=scenario_data["technical_kpis"],
+            source_name=scenario_name,
+            source_type="Scenario"
+        )
+
+    # Processa i dati della letteratura
+    for literature_name, literature_data in st.session_state.literature.items():
+        process_source_data(
+            source=literature_data["technical_kpis"],
+            source_name=literature_name,
+            source_type="Literature"
+        )
+
+    # Crea il DataFrame
+    mass_volume_df = pd.DataFrame(mass_volume_ratios)
     # Converti i dati in DataFrame
     phase_df = pd.DataFrame(phase_data)
     overall_df = pd.DataFrame(overall_data)
@@ -1915,17 +1905,17 @@ def benchmarking():
         ax_sl_ratio.set_xticklabels(overall_df["Source"], rotation=45, ha="right")
         st.pyplot(fig_sl_ratio)
 
-    # Radar Chart (Spider Plot) for Mass/Volume Ratios
+    # --- Radar Chart (Spider Plot) ---
     st.markdown("### Radar Chart (Spider Plot) for Mass/Volume Ratios")
     fig, ax = plt.subplots(figsize=(8, 8), subplot_kw=dict(polar=True))
 
-    # Ottieni tutte le combinazioni di fase e tipo di liquido
+    # Trova tutte le combinazioni di fase e tipo di liquido
     phases_liquids = mass_volume_df[["Phase", "Liquid Type"]].drop_duplicates().values.tolist()
     num_vars = len(phases_liquids)
     angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
-    angles += angles[:1]  # Chiude il radar chart
+    angles += angles[:1]  # Chiudi il radar chart
 
-    # Aggiungi i dati per ogni fonte (scenario o letteratura)
+    # Aggiungi i dati per ogni fonte (scenari e letteratura)
     for source in mass_volume_df["Source"].unique():
         source_data = mass_volume_df[mass_volume_df["Source"] == source]
         data = [
@@ -1934,7 +1924,7 @@ def benchmarking():
                 ]["S/L Ratio"].sum()
             for phase, liquid in phases_liquids
         ]
-        data += data[:1]  # Chiude il radar plot
+        data += data[:1]  # Chiudi il radar chart
         ax.plot(angles, data, label=source, linewidth=2)
         ax.fill(angles, data, alpha=0.25)
 
