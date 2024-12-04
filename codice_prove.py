@@ -1966,93 +1966,80 @@ def benchmarking():
         ax_sl_ratio.set_xticklabels(overall_df["Source"], rotation=45, ha="right")
         st.pyplot(fig_sl_ratio)
 
-    # --- Radar Chart per Rapporti S/L ---
+    # Radar Chart
     st.markdown("### Radar Chart (Spider Plot) for Mass/Volume Ratios")
-    fig, ax = plt.subplots(figsize=(8, 8), subplot_kw=dict(polar=True))
+    fig, ax = plt.subplots(figsize=(12, 8), subplot_kw=dict(polar=True))
 
-    # Ensure mass_volume_df includes both scenarios and literature data
-    # First, let's debug the data
-    st.write("Debug: Available sources in the data:")
-    st.write(mass_volume_df["Source"].unique())
-    st.write("\nDebug: Sample of phases and liquid types:")
-    st.write(mass_volume_df[["Source", "Phase", "Liquid Type", "S/L Ratio"]].head())
+    # Filter out rows with zero ratios and duplicates
+    valid_data = mass_volume_df[mass_volume_df["S/L Ratio"] > 0].drop_duplicates()
 
-    # Prepare angles for the radar chart
-    # Filter out None/NaN values
-    phases_liquids = mass_volume_df[
-        mass_volume_df["Phase"].notna() &
-        mass_volume_df["Liquid Type"].notna()
-        ][["Phase", "Liquid Type"]].drop_duplicates().values.tolist()
+    # Get unique phase-liquid combinations
+    phases_liquids = valid_data[["Phase", "Liquid Type"]].drop_duplicates().values.tolist()
 
     if not phases_liquids:
-        st.error("No valid phase/liquid combinations found in the data.")
+        st.error("No valid phase/liquid combinations found with non-zero ratios.")
         return
 
+    # Prepare angles
     num_vars = len(phases_liquids)
     angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
-    angles += angles[:1]
+    angles += angles[:1]  # Complete the circle
 
-    # Create radar chart with different colors for scenarios and literature
-    colors = plt.cm.Set3(np.linspace(0, 1, len(mass_volume_df["Source"].unique())))
+    # Use different colors for different sources
+    colors = plt.cm.Set3(np.linspace(0, 1, len(valid_data["Source"].unique())))
 
-    for idx, source in enumerate(mass_volume_df["Source"].unique()):
-        source_data = mass_volume_df[mass_volume_df["Source"] == source]
-
-        # Debug information
-        st.write(f"\nProcessing source: {source}")
-        st.write(f"Number of data points: {len(source_data)}")
+    for idx, source in enumerate(valid_data["Source"].unique()):
+        source_data = valid_data[valid_data["Source"] == source]
 
         data = []
         for phase, liquid in phases_liquids:
             ratio = source_data[
                 (source_data["Phase"] == phase) &
                 (source_data["Liquid Type"] == liquid)
-                ]["S/L Ratio"].sum()
+                ]["S/L Ratio"].values
+
+            ratio = ratio[0] if len(ratio) > 0 else 0
             data.append(ratio)
 
-            # Debug information for each phase/liquid combination
-            st.write(f"Phase: {phase}, Liquid: {liquid}, Ratio: {ratio}")
+        data += data[:1]  # Complete the circle
 
-        data += data[:1]  # Close the polygon
-
-        # Plot with different line styles for scenarios and literature
+        # Different styles for scenarios and literature
         if "Literature" in source:
-            linestyle = '--'  # Dashed line for literature
-            alpha = 0.15  # Lower alpha for literature
+            linestyle = '--'
+            alpha = 0.15
         else:
-            linestyle = '-'  # Solid line for scenarios
+            linestyle = '-'
             alpha = 0.25
 
         ax.plot(angles, data, label=source, linewidth=2,
                 color=colors[idx], linestyle=linestyle)
         ax.fill(angles, data, alpha=alpha, color=colors[idx])
 
-    # Improve label formatting and placement
+    # Improve labels
     labels = [f"{phase}\n({liquid})" for phase, liquid in phases_liquids]
     ax.set_xticks(angles[:-1])
     ax.set_xticklabels(labels, fontsize=8)
 
-    # Improve the layout
-    ax.set_title("Mass/Volume Ratios by Phase and Liquid\n(Solid lines: Scenarios, Dashed lines: Literature)",
-                 pad=20, fontsize=10)
+    # Add title and legend
+    plt.title("Mass/Volume Ratios by Phase and Liquid\n(Solid lines: Scenarios, Dashed lines: Literature)",
+              pad=20, fontsize=10)
+    plt.legend(loc='center left', bbox_to_anchor=(1.2, 0.5),
+               fontsize=8, title="Sources")
 
-    # Adjust legend
-    ax.legend(loc='center left', bbox_to_anchor=(1.2, 0.5),
-              fontsize=8, title="Sources")
-
-    # Add gridlines
+    # Add grid and adjust layout
     ax.grid(True, alpha=0.2)
-
-    # Make the plot more readable
     plt.tight_layout()
+
+    # Show the plot
     st.pyplot(fig)
 
-    # Add a note about the visualization
+    # Add explanatory note
     st.info("""
     The radar chart above shows the S/L ratios for different phases and liquids.
     - Solid lines represent scenarios
     - Dashed lines represent literature case studies
     - The further a point is from the center, the higher the S/L ratio
+    - Zero ratios are excluded for better visualization
     """)
     # --- Confronto tra Scenari ---
     st.markdown("### Scenario Comparison")
