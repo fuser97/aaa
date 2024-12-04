@@ -1778,71 +1778,87 @@ def benchmarking():
 
     # Itera sulle fonti (scenari e studi)
     mass_volume_ratios = []  # Lista per raccogliere i dati
+    # Inside the benchmarking function, modify the data collection part:
 
+    # Modify the phase data collection loop
     for source in sources:
         source_name = source["name"]
         source_type = source["type"]
         source_data = source["data"]
 
-        # Assicurati che i dati tecnici siano inizializzati
-        source_data.setdefault("technical_kpis", {})
-        source_data["technical_kpis"].setdefault("phases", {})
+        # Get the technical KPIs data
+        tech_kpis = source_data.get("technical_kpis", {})
+        phases = tech_kpis.get("phases", {})
 
-        # Recupera le fasi
-        phases = source_data["technical_kpis"]["phases"]
-
-        for phase_name, phase_info in phases.items():
-            # Recupera la massa totale per la fase
-            total_mass = phase_info.get("mass", 0)
-
-            # Recupera i dati sui liquidi
-            liquids = phase_info.get("liquids", [])
-
-            # Assicurati che `liquids` sia una lista valida
-            if not isinstance(liquids, list):
-                liquids = []
+        for phase_name, phase_data in phases.items():
+            # Get mass data - handle both dictionary and direct value formats
+            if isinstance(phase_data.get("masses", {}), dict):
+                total_mass = sum(phase_data.get("masses", {}).values())
             else:
-                liquids = [liquid for liquid in liquids if isinstance(liquid, dict)]
+                total_mass = phase_data.get("mass", 0)
 
-            # Calcola il volume totale dei liquidi
-            total_volume = sum(
-                liquid.get("volume", 0) for liquid in liquids if isinstance(liquid.get("volume", 0), (int, float))
-            )
+            # Get liquids data - handle both list and dictionary formats
+            liquids = phase_data.get("liquids", [])
+            if isinstance(liquids, list):
+                # Handle list format
+                for liquid in liquids:
+                    if isinstance(liquid, dict):
+                        liquid_type = liquid.get("type", "Unknown")
+                        liquid_volume = liquid.get("volume", 0)
 
-            # Calcolo rapporto complessivo
-            overall_ratio = total_mass / total_volume if total_volume > 0 else 0
+                        if liquid_volume > 0:
+                            sl_ratio = total_mass / liquid_volume
+                        else:
+                            sl_ratio = 0
 
-            # Aggiungi i dati complessivi della fase
+                        mass_volume_ratios.append({
+                            "Source": f"{source_type}: {source_name}",
+                            "Phase": phase_name,
+                            "Liquid Type": liquid_type,
+                            "Phase Mass (kg)": total_mass,
+                            "Liquid Volume (L)": liquid_volume,
+                            "S/L Ratio": sl_ratio
+                        })
+
+            elif isinstance(liquids, dict):
+                # Handle dictionary format
+                for liquid_type, liquid_volume in liquids.items():
+                    if liquid_volume > 0:
+                        sl_ratio = total_mass / liquid_volume
+                    else:
+                        sl_ratio = 0
+
+                    mass_volume_ratios.append({
+                        "Source": f"{source_type}: {source_name}",
+                        "Phase": phase_name,
+                        "Liquid Type": liquid_type,
+                        "Phase Mass (kg)": total_mass,
+                        "Liquid Volume (L)": liquid_volume,
+                        "S/L Ratio": sl_ratio
+                    })
+
+            # Calculate overall ratio for the phase
+            total_volume = sum(liquid.get("volume", 0) for liquid in liquids) if isinstance(liquids, list) else sum(
+                liquids.values())
+
+            if total_volume > 0:
+                overall_ratio = total_mass / total_volume
+            else:
+                overall_ratio = 0
+
             mass_volume_ratios.append({
                 "Source": f"{source_type}: {source_name}",
                 "Phase": phase_name,
                 "Liquid Type": "Overall",
                 "Phase Mass (kg)": total_mass,
                 "Liquid Volume (L)": total_volume,
-                "S/L Ratio": overall_ratio,
+                "S/L Ratio": overall_ratio
             })
 
-            # Itera sui liquidi per calcolare il rapporto specifico
-            for liquid in liquids:
-                liquid_type = liquid.get("type", "Unknown")
-                liquid_volume = liquid.get("volume", 0)
-
-                # Verifica che il volume sia valido
-                if not isinstance(liquid_volume, (int, float)):
-                    liquid_volume = 0  # Imposta a 0 se non è valido
-
-                # Calcolo del rapporto massa/volume per il liquido specifico
-                sl_ratio = total_mass / liquid_volume if liquid_volume > 0 else 0
-
-                # Aggiungi i dati specifici per tipo di liquido
-                mass_volume_ratios.append({
-                    "Source": f"{source_type}: {source_name}",
-                    "Phase": phase_name,
-                    "Liquid Type": liquid_type,
-                    "Phase Mass (kg)": total_mass,
-                    "Liquid Volume (L)": liquid_volume,
-                    "S/L Ratio": sl_ratio,
-                })
+    # Debug output
+    st.write("Processed Data:")
+    debug_df = pd.DataFrame(mass_volume_ratios)
+    st.write(debug_df)
 
     # Dopo l'iterazione, mass_volume_ratios conterrà i dati per benchmarking
     mass_volume_df = pd.DataFrame(mass_volume_ratios)
