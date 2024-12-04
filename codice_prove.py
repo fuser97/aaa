@@ -1929,24 +1929,48 @@ def benchmarking():
     angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
     angles += angles[:1]
 
+    # Prima di creare il grafico, verifichiamo le fonti disponibili
+    print("Available sources:", mass_volume_df["Source"].unique())  # Debug print
+
+    # Iterazione su tutte le fonti uniche
     for source in mass_volume_df["Source"].unique():
-        source_data = mass_volume_df[mass_volume_df["Source"] == source]
-        data = [
-            source_data[
-                (source_data["Phase"] == phase) & (source_data["Liquid Type"] == liquid)
-                ]["S/L Ratio"].sum()
-            for phase, liquid in phases_liquids
-        ]
+        source_data = mass_volume_df[mass_volume_df["Source"] == source].copy()
+
+        # Debug print
+        print(f"Processing source: {source}")
+        print(f"Number of rows for {source}: {len(source_data)}")
+
+        # Crea una lista di valori per questa fonte
+        data = []
+        for phase, liquid in phases_liquids:
+            value = source_data[
+                (source_data["Phase"] == phase) &
+                (source_data["Liquid Type"] == liquid)
+                ]["S/L Ratio"].mean()  # Using mean instead of sum
+
+            # Se non ci sono valori, usa 0 o None
+            data.append(value if not np.isnan(value) else 0)
+
+        # Aggiungi il primo valore alla fine per chiudere il poligono
         data += data[:1]
-        ax.plot(angles, data, label=source, linewidth=2)
+
+        # Plot della linea
+        ax.plot(angles, data, label=source, linewidth=2, marker='o')
         ax.fill(angles, data, alpha=0.25)
 
+    # Impostazione delle etichette
     labels = [f"{phase}\n({liquid})" for phase, liquid in phases_liquids]
     ax.set_xticks(angles[:-1])
     ax.set_xticklabels(labels, fontsize=10)
 
+    # Aggiungi una griglia
+    ax.grid(True)
+
+    # Imposta il titolo e la legenda
     ax.set_title("Mass/Volume Ratios by Phase and Liquid")
-    ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1))
+    ax.legend(loc="center left", bbox_to_anchor=(1.1, 0.5))
+
+    # Mostra il grafico
     st.pyplot(fig)
 
     # --- Confronto tra Scenari ---
