@@ -1650,132 +1650,334 @@ def benchmarking():
             "data": case_study_data
         })
 
-    # --- Confronto KPI Economici ---
+    # Confronto dei KPI economici
     st.markdown("### Economic KPI Comparison: CapEx and OpEx")
 
-    economic_data = []
+    # Raccogli i dati per CapEx e OpEx
+    economic_data_capex = []
+    economic_data_opex = []
+
     for source in sources:
         source_name = source["name"]
         source_type = source["type"]
         source_data = source["data"]
 
+        # Calcolo totale CapEx
         total_capex = sum(source_data.get("capex", {}).values())
-        total_opex = sum(source_data.get("opex", {}).values())
-
-        economic_data.append({
+        economic_data_capex.append({
             "Source": f"{source_type}: {source_name}",
-            "CapEx (EUR)": total_capex,
+            "CapEx (EUR)": total_capex
+        })
+
+        # Calcolo totale OpEx
+        total_opex = sum(source_data.get("opex", {}).values())
+        economic_data_opex.append({
+            "Source": f"{source_type}: {source_name}",
             "OpEx (EUR)": total_opex
         })
 
-    economic_df = pd.DataFrame(economic_data)
+    # Converti i dati in DataFrame per la visualizzazione
+    capex_df = pd.DataFrame(economic_data_capex)
+    opex_df = pd.DataFrame(economic_data_opex)
 
-    # Visualizzazione tabelle e grafici
-    st.markdown("#### CapEx and OpEx Table")
-    st.table(economic_df)
+    # Visualizza le tabelle
+    st.markdown("#### CapEx Comparison Table")
+    st.table(capex_df)
 
-    for kpi in ["CapEx (EUR)", "OpEx (EUR)"]:
-        st.markdown(f"#### {kpi} Chart")
-        fig, ax = plt.subplots(figsize=(10, 6))
-        ax.bar(economic_df["Source"], economic_df[kpi], color="blue" if "CapEx" in kpi else "green")
-        ax.set_xlabel("Sources")
-        ax.set_ylabel(kpi)
-        ax.set_title(f"{kpi} Comparison")
-        ax.set_xticklabels(economic_df["Source"], rotation=45, ha="right")
-        st.pyplot(fig)
+    st.markdown("#### OpEx Comparison Table")
+    st.table(opex_df)
 
-    # --- Confronto Efficienze ---
+    # Visualizza il grafico per CapEx
+    st.markdown("#### CapEx Comparison Chart")
+    fig_capex, ax_capex = plt.subplots(figsize=(10, 6))
+    ax_capex.bar(capex_df["Source"], capex_df["CapEx (EUR)"], color='blue')
+    ax_capex.set_xlabel("Sources")
+    ax_capex.set_ylabel("CapEx (EUR)")
+    ax_capex.set_title("CapEx Comparison")
+    ax_capex.set_xticklabels(capex_df["Source"], rotation=45, ha="right")
+    st.pyplot(fig_capex)
+
+    # Visualizza il grafico per OpEx
+    st.markdown("#### OpEx Comparison Chart")
+    fig_opex, ax_opex = plt.subplots(figsize=(10, 6))
+    ax_opex.bar(opex_df["Source"], opex_df["OpEx (EUR)"], color='green')
+    ax_opex.set_xlabel("Sources")
+    ax_opex.set_ylabel("OpEx (EUR)")
+    ax_opex.set_title("OpEx Comparison")
+    ax_opex.set_xticklabels(opex_df["Source"], rotation=45, ha="right")
+    st.pyplot(fig_opex)
+
+    # Confronto delle efficienze (overall e per materiale)
     st.markdown("### Efficiency Comparison: Overall and Per Material")
 
+    # Raccogli i dati per l'efficienza
     efficiency_data = []
-    materials = set()
+    materials = set()  # Per raccogliere tutti i tipi di materiale unici
 
     for source in sources:
         source_name = source["name"]
         source_type = source["type"]
         source_data = source["data"]
 
+        # Recupera l'efficienza totale
         overall_efficiency = source_data.get("technical_kpis", {}).get("efficiency", 0)
+
+        # Recupera le efficienze per materiale
         material_efficiencies = source_data.get("technical_kpis", {}).get("composition", {})
         recovered_masses = source_data.get("technical_kpis", {}).get("recovered_masses", {})
+        material_efficiency_data = {}
 
-        material_eff_data = {}
         for material, percentage in material_efficiencies.items():
-            initial_mass = percentage / 100
+            initial_mass = percentage / 100  # Percentuale in termini di frazione
             recovered_mass = recovered_masses.get(material, 0)
             efficiency = (recovered_mass / initial_mass) * 100 if initial_mass > 0 else 0
-            material_eff_data[material] = efficiency
+            material_efficiency_data[material] = efficiency
             materials.add(material)
 
+        # Aggiungi al dataset
         efficiency_data.append({
             "Source": f"{source_type}: {source_name}",
             "Overall Efficiency (%)": overall_efficiency,
-            **material_eff_data
+            **material_efficiency_data
         })
 
+    # Converti i dati in DataFrame per il confronto
     efficiency_df = pd.DataFrame(efficiency_data).fillna(0)
 
+    # Visualizza la tabella per l'efficienza totale
     st.markdown("#### Overall Efficiency Table")
     st.table(efficiency_df[["Source", "Overall Efficiency (%)"]])
 
+    # Visualizza un grafico a barre per l'efficienza totale
     st.markdown("#### Overall Efficiency Chart")
-    fig_eff, ax_eff = plt.subplots(figsize=(10, 6))
-    ax_eff.bar(efficiency_df["Source"], efficiency_df["Overall Efficiency (%)"], color="purple")
-    ax_eff.set_xlabel("Sources")
-    ax_eff.set_ylabel("Efficiency (%)")
-    ax_eff.set_title("Overall Efficiency Comparison")
-    ax_eff.set_xticklabels(efficiency_df["Source"], rotation=45, ha="right")
-    st.pyplot(fig_eff)
+    fig_overall, ax_overall = plt.subplots(figsize=(10, 6))
+    ax_overall.bar(efficiency_df["Source"], efficiency_df["Overall Efficiency (%)"], color="purple")
+    ax_overall.set_xlabel("Sources")
+    ax_overall.set_ylabel("Overall Efficiency (%)")
+    ax_overall.set_title("Overall Efficiency Comparison")
+    ax_overall.set_xticklabels(efficiency_df["Source"], rotation=45, ha="right")
+    st.pyplot(fig_overall)
 
-    # --- Confronto Massa/Liquidi ---
+    # Visualizza i grafici a barre per i materiali
+    for material in sorted(materials):
+        st.markdown(f"#### Efficiency Comparison for {material}")
+        fig_material, ax_material = plt.subplots(figsize=(10, 6))
+        ax_material.bar(efficiency_df["Source"], efficiency_df.get(material, 0), color="orange")
+        ax_material.set_xlabel("Sources")
+        ax_material.set_ylabel(f"Efficiency for {material} (%)")
+        ax_material.set_title(f"{material} Efficiency Comparison")
+        ax_material.set_xticklabels(efficiency_df["Source"], rotation=45, ha="right")
+        st.pyplot(fig_material)
+
+    # Confronto massa/volume per fase
     st.markdown("### Solid/Liquid Ratios Comparison: Per Phase and Overall")
 
-    mass_volume_ratios = []
+    # Raccogli i dati per il confronto
+    phase_data = []  # Dati per confronto fase/liquido
+    overall_data = []  # Dati complessivi per confronto generale
+
+    # Itera sulle fonti (scenari e studi)
+    mass_volume_ratios = []  # Lista per raccogliere i dati
+
     for source in sources:
         source_name = source["name"]
         source_type = source["type"]
         source_data = source["data"]
 
-        phases = source_data.get("technical_kpis", {}).get("phases", {})
+        # Assicurati che i dati tecnici siano inizializzati
+        source_data.setdefault("technical_kpis", {})
+        source_data["technical_kpis"].setdefault("phases", {})
+
+        # Recupera le fasi
+        phases = source_data["technical_kpis"]["phases"]
+
         for phase_name, phase_info in phases.items():
-            phase_mass = phase_info.get("mass", 0)
+            # Recupera la massa totale per la fase
+            total_mass = phase_info.get("mass", 0)
+
+            # Recupera i dati sui liquidi
             liquids = phase_info.get("liquids", [])
 
+            # Assicurati che `liquids` sia una lista valida
             if not isinstance(liquids, list):
                 liquids = []
+            else:
+                liquids = [liquid for liquid in liquids if isinstance(liquid, dict)]
 
-            total_volume = sum(liquid.get("volume", 0) for liquid in liquids)
-            overall_ratio = phase_mass / total_volume if total_volume > 0 else 0
+            # Calcola il volume totale dei liquidi
+            total_volume = sum(
+                liquid.get("volume", 0) for liquid in liquids if isinstance(liquid.get("volume", 0), (int, float))
+            )
 
+            # Calcolo rapporto complessivo
+            overall_ratio = total_mass / total_volume if total_volume > 0 else 0
+
+            # Aggiungi i dati complessivi della fase
             mass_volume_ratios.append({
                 "Source": f"{source_type}: {source_name}",
                 "Phase": phase_name,
                 "Liquid Type": "Overall",
-                "Phase Mass (kg)": phase_mass,
+                "Phase Mass (kg)": total_mass,
                 "Liquid Volume (L)": total_volume,
                 "S/L Ratio": overall_ratio,
             })
 
+            # Itera sui liquidi per calcolare il rapporto specifico
+            for liquid in liquids:
+                liquid_type = liquid.get("type", "Unknown")
+                liquid_volume = liquid.get("volume", 0)
+
+                # Verifica che il volume sia valido
+                if not isinstance(liquid_volume, (int, float)):
+                    liquid_volume = 0  # Imposta a 0 se non è valido
+
+                # Calcolo del rapporto massa/volume per il liquido specifico
+                sl_ratio = total_mass / liquid_volume if liquid_volume > 0 else 0
+
+                # Aggiungi i dati specifici per tipo di liquido
+                mass_volume_ratios.append({
+                    "Source": f"{source_type}: {source_name}",
+                    "Phase": phase_name,
+                    "Liquid Type": liquid_type,
+                    "Phase Mass (kg)": total_mass,
+                    "Liquid Volume (L)": liquid_volume,
+                    "S/L Ratio": sl_ratio,
+                })
+
+    # Dopo l'iterazione, mass_volume_ratios conterrà i dati per benchmarking
     mass_volume_df = pd.DataFrame(mass_volume_ratios)
 
-    st.markdown("#### Solid/Liquid Ratios Table")
-    st.table(mass_volume_df)
+    # Converti i dati in DataFrame
+    phase_df = pd.DataFrame(phase_data)
+    overall_df = pd.DataFrame(overall_data)
 
-    # Grafici delle proporzioni complessive
-    for col, label, color in [
-        ("Phase Mass (kg)", "Total Mass (kg)", "blue"),
-        ("Liquid Volume (L)", "Total Volume (L)", "green"),
-        ("S/L Ratio", "Solid/Liquid Ratio", "purple")
-    ]:
-        st.markdown(f"#### {label} Comparison")
-        fig, ax = plt.subplots(figsize=(10, 6))
-        ax.bar(mass_volume_df["Source"], mass_volume_df[col], color=color)
-        ax.set_xlabel("Sources")
-        ax.set_ylabel(label)
-        ax.set_title(f"{label} Comparison")
-        ax.set_xticklabels(mass_volume_df["Source"], rotation=45, ha="right")
-        st.pyplot(fig)
+    # --- Confronto per fase/liquido ---
+    st.markdown("#### Phase-Specific Solid/Liquid Ratios Table")
 
+    # Assicura che `mass_volume_df` esista e non sia vuoto
+    if not mass_volume_df.empty:
+        for phase_name in mass_volume_df["Phase"].unique():
+            st.markdown(f"##### Phase: {phase_name}")
+
+            # Filtra i dati per la fase corrente
+            phase_specific_df = mass_volume_df[mass_volume_df["Phase"] == phase_name]
+
+            try:
+                # Pivot table per mostrare i dati organizzati
+                pivot_table = phase_specific_df.pivot_table(
+                    index=["Liquid Type"],
+                    columns=["Source"],
+                    values=["Phase Mass (kg)", "Liquid Volume (L)", "S/L Ratio"],
+                    aggfunc="first"
+                )
+                st.table(pivot_table)
+            except Exception as e:
+                st.error(f"Error creating pivot table for phase {phase_name}: {str(e)}")
+
+    # --- Confronto complessivo ---
+    st.markdown("#### Overall Solid/Liquid Ratios Table")
+
+    # Aggrega i dati complessivi per ogni fonte
+    overall_df = (
+        mass_volume_df[mass_volume_df["Liquid Type"] == "Overall"]
+            .groupby("Source")[["Phase Mass (kg)", "Liquid Volume (L)", "S/L Ratio"]]
+            .sum()
+            .reset_index()
+    )
+
+    if not overall_df.empty:
+        st.table(overall_df)
+
+    # --- Visualizzazioni Grafiche ---
+    st.markdown("### Graphical Representations")
+
+    # Grafico comparativo per le masse complessive
+    if not overall_df.empty:
+        fig_mass, ax_mass = plt.subplots(figsize=(10, 6))
+        ax_mass.bar(overall_df["Source"], overall_df["Phase Mass (kg)"], color="blue")
+        ax_mass.set_xlabel("Sources")
+        ax_mass.set_ylabel("Total Mass (kg)")
+        ax_mass.set_title("Total Mass Comparison")
+        ax_mass.set_xticklabels(overall_df["Source"], rotation=45, ha="right")
+        st.pyplot(fig_mass)
+
+        # Grafico comparativo per i volumi complessivi
+        fig_volume, ax_volume = plt.subplots(figsize=(10, 6))
+        ax_volume.bar(overall_df["Source"], overall_df["Liquid Volume (L)"], color="green")
+        ax_volume.set_xlabel("Sources")
+        ax_volume.set_ylabel("Total Volume (L)")
+        ax_volume.set_title("Total Volume Comparison")
+        ax_volume.set_xticklabels(overall_df["Source"], rotation=45, ha="right")
+        st.pyplot(fig_volume)
+
+        # Grafico comparativo per il rapporto S/L complessivo
+        fig_sl_ratio, ax_sl_ratio = plt.subplots(figsize=(10, 6))
+        ax_sl_ratio.bar(overall_df["Source"], overall_df["S/L Ratio"], color="purple")
+        ax_sl_ratio.set_xlabel("Sources")
+        ax_sl_ratio.set_ylabel("Overall S/L Ratio")
+        ax_sl_ratio.set_title("Overall S/L Ratio Comparison")
+        ax_sl_ratio.set_xticklabels(overall_df["Source"], rotation=45, ha="right")
+        st.pyplot(fig_sl_ratio)
+
+    # --- Radar Chart per Rapporti S/L ---
+    st.markdown("### Radar Chart (Spider Plot) for Mass/Volume Ratios")
+    fig, ax = plt.subplots(figsize=(8, 8), subplot_kw=dict(polar=True))
+
+    # Prepara gli angoli per il radar chart
+    phases_liquids = mass_volume_df[["Phase", "Liquid Type"]].drop_duplicates().values.tolist()
+    num_vars = len(phases_liquids)
+    angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
+    angles += angles[:1]
+
+    for source in mass_volume_df["Source"].unique():
+        source_data = mass_volume_df[mass_volume_df["Source"] == source]
+        data = [
+            source_data[
+                (source_data["Phase"] == phase) & (source_data["Liquid Type"] == liquid)
+                ]["S/L Ratio"].sum()
+            for phase, liquid in phases_liquids
+        ]
+        data += data[:1]
+        ax.plot(angles, data, label=source, linewidth=2)
+        ax.fill(angles, data, alpha=0.25)
+
+    labels = [f"{phase}\n({liquid})" for phase, liquid in phases_liquids]
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(labels, fontsize=10)
+
+    ax.set_title("Mass/Volume Ratios by Phase and Liquid")
+    ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1))
+    st.pyplot(fig)
+
+    # --- Confronto tra Scenari ---
+    st.markdown("### Scenario Comparison")
+
+    # Confronto basato su masse, volumi e rapporti medi S/L
+    scenario_data = {}
+    for source in mass_volume_df["Source"].unique():
+        source_df = mass_volume_df[mass_volume_df["Source"] == source]
+        total_mass = source_df["Phase Mass (kg)"].sum()
+        total_volume = source_df["Liquid Volume (L)"].sum()
+        avg_ratio = source_df["S/L Ratio"].mean()
+
+        scenario_data[source] = {
+            "Total Mass (kg)": total_mass,
+            "Total Volume (L)": total_volume,
+            "Average S/L Ratio": avg_ratio
+        }
+
+    comparison_df = pd.DataFrame(scenario_data).T.reset_index().rename(columns={"index": "Source"})
+    st.table(comparison_df)
+
+    # Grafico per confrontare i valori medi di massa, volume e rapporto
+    if not comparison_df.empty:
+        fig_comparison, ax_comparison = plt.subplots(figsize=(10, 6))
+        ax_comparison.bar(comparison_df["Source"], comparison_df["Average S/L Ratio"], color="cyan")
+        ax_comparison.set_xlabel("Sources")
+        ax_comparison.set_ylabel("Average S/L Ratio")
+        ax_comparison.set_title("Average Solid/Liquid Ratio Comparison")
+        ax_comparison.set_xticklabels(comparison_df["Source"], rotation=45, ha="right")
+        st.pyplot(fig_comparison)
 
 
 if page == "Economic KPIs":
